@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+	.vf-card {
+		@apply bg-white/80 backdrop-blur border border-purple-100 rounded-xl shadow-sm;
+	}
+
+	.vf-input {
+		@apply w-full rounded-md border-purple-200 focus:border-purple-500 focus:ring-purple-500;
+	}
+
+	.vf-btn {
+		@apply inline-flex items-center justify-center px-4 py-2 rounded-md text-white font-medium bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500;
+	}
+}
