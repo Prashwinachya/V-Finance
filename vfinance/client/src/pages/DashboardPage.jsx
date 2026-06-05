@@ -20,8 +20,7 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatDate } from '../utils/format';
-
-const apiOrigin = String(import.meta.env.VITE_API_URL || 'http://localhost:5050/api').replace(/\/api\/?$/, '');
+import UserAvatar from '../components/UserAvatar';
 
 const baseQuickActions = [
   {
@@ -90,19 +89,47 @@ const formatMoney = (amount = 0) =>
     maximumFractionDigits: 2,
   }).format(amount);
 
+const roleLabel = (role) => {
+  if (role === 'business_user') return 'Business User';
+  if (role === 'student') return 'Student';
+  if (role === 'super_admin') return 'Super Admin';
+  if (role === 'admin') return 'Admin';
+  return 'Student';
+};
+
 const DashboardPage = () => {
   const { user } = useAuth();
+  const interfaceRole = user?.portalRole || user?.role;
   const [clock, setClock] = useState(new Date());
   const [dashboard, setDashboard] = useState(null);
-
-  const avatarSrc = useMemo(() => {
-    if (!user?.avatarUrl) return null;
-    return user.avatarUrl.startsWith('http') ? user.avatarUrl : `${apiOrigin}${user.avatarUrl}`;
-  }, [user?.avatarUrl]);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const [dashboardError, setDashboardError] = useState('');
 
   const loadDashboard = async () => {
-    const response = await api.get('/dashboard');
-    setDashboard(response.data);
+    setLoadingDashboard(true);
+    setDashboardError('');
+
+    try {
+      const response = await api.get('/dashboard');
+      const payload = response.data || {};
+      const summary = payload.summary || {};
+
+      setDashboard({
+        totalIncome: Number(summary.totalIncome || payload.totalIncome || 0),
+        totalExpenses: Number(summary.totalExpenses || payload.totalExpenses || 0),
+        totalBalance: Number(summary.balance || payload.totalBalance || 0),
+        monthlyIncome: Number(summary.monthlyIncome || payload.monthlyIncome || 0),
+        monthlyExpenses: Number(summary.monthlyExpenses || payload.monthlyExpenses || 0),
+        walletSavings: Number(payload.walletSavings || 0),
+        walletCount: Number(payload.walletCount || 0),
+        trendPercentage: Number(payload.trendPercentage || 0),
+        recentTransactions: Array.isArray(payload.recentTransactions) ? payload.recentTransactions : [],
+      });
+    } catch (requestError) {
+      setDashboardError(requestError?.response?.data?.message || 'Unable to load dashboard right now.');
+    } finally {
+      setLoadingDashboard(false);
+    }
   };
 
   useEffect(() => {
@@ -139,10 +166,7 @@ const DashboardPage = () => {
     return 'Good night';
   }, [clock]);
 
-  const walletCount = useMemo(() => {
-    const ids = new Set((dashboard?.recentTransactions || []).map((item) => String(item.wallet || 'main')));
-    return ids.size;
-  }, [dashboard]);
+  const walletCount = Number(dashboard?.walletCount || 0);
 
   const netThisMonth = useMemo(() => {
     if (!dashboard) return 0;
@@ -161,9 +185,11 @@ const DashboardPage = () => {
   }, [dashboard]);
 
   const quickActions = useMemo(() => {
+    const actionsWithoutLoans = baseQuickActions.filter((item) => item.path !== '/loans/optimizer');
+
     if (user?.role === 'admin' || user?.role === 'super_admin') {
       return [
-        ...baseQuickActions.slice(0, 7),
+        ...actionsWithoutLoans.slice(0, 6),
         {
           title: 'Admin Center',
           subtitle: 'Manage users and controls',
@@ -174,11 +200,34 @@ const DashboardPage = () => {
       ];
     }
 
-    return baseQuickActions.slice(0, 7);
-  }, [user?.role]);
+    if (interfaceRole === 'student' || interfaceRole === 'user') {
+      return actionsWithoutLoans.slice(0, 7);
+    }
+
+    if (interfaceRole === 'business_user') {
+      return baseQuickActions.slice(0, 7);
+    }
+
+    return actionsWithoutLoans.slice(0, 7);
+  }, [interfaceRole, user?.role]);
+
+  if (loadingDashboard) {
+    return <div className="card-soft">Loading dashboard...</div>;
+  }
 
   if (!dashboard) {
-    return <div className="card-soft">Loading dashboard...</div>;
+    return (
+      <div className="card-soft space-y-3">
+        <p className="text-sm font-semibold text-rose-600">{dashboardError || 'Dashboard data unavailable.'}</p>
+        <button
+          type="button"
+          onClick={loadDashboard}
+          className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -204,21 +253,28 @@ const DashboardPage = () => {
             </div>
 
             <div className="mt-4 inline-flex items-center gap-3 rounded-2xl border border-white/25 bg-white/10 px-3 py-2 backdrop-blur-sm">
-              {avatarSrc ? (
-                <img
-                  src={avatarSrc}
-                  alt="Profile"
-                  className="h-10 w-10 rounded-full border border-white/40 object-cover"
-                />
-              ) : (
-                <span className="grid h-10 w-10 place-items-center rounded-full bg-white/25 text-sm font-semibold text-white">
-                  {user?.name?.[0] || 'U'}
-                </span>
-              )}
+              <UserAvatar user={user} size="h-10 w-10" textSize="text-sm" className="border border-white/40" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-white">{user?.name || 'User'}</p>
                 <p className="truncate text-xs text-white/75">{user?.email || 'No email'}</p>
               </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full border border-white/30 bg-white/15 px-3 py-1 font-semibold text-white">
+                {roleLabel(user?.role)} Mode
+              </span>
+              {(interfaceRole === 'business_user') ? (
+                <>
+                  <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 font-semibold text-white/90">Bank Sync Priority</span>
+                  <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 font-semibold text-white/90">Manual Entry Locked</span>
+                </>
+              ) : (
+                <>
+                  <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 font-semibold text-white/90">Manual Transaction Entry</span>
+                  <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 font-semibold text-white/90">Optional Bank Sync</span>
+                </>
+              )}
             </div>
 
             <p className="mt-4 max-w-2xl text-sm text-white/85">
@@ -305,13 +361,7 @@ const DashboardPage = () => {
           <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="inline-flex items-center gap-3">
-                {avatarSrc ? (
-                  <img src={avatarSrc} alt="Avatar" className="h-10 w-10 rounded-full border border-white/30 object-cover" />
-                ) : (
-                  <span className="grid h-10 w-10 place-items-center rounded-full bg-orange-500 text-sm font-semibold text-white">
-                    {user?.name?.[0] || 'V'}
-                  </span>
-                )}
+                <UserAvatar user={user} size="h-10 w-10" textSize="text-sm" className="border border-white/30" />
                 <div>
                   <p className="font-semibold text-white">{user?.name || 'User'}</p>
                   <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs text-slate-100">Primary profile</span>

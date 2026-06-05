@@ -13,6 +13,7 @@ import SettingsPage from './pages/SettingsPage';
 import SubscriptionRadarPage from './pages/SubscriptionRadarPage';
 import LoanOptimizerPage from './pages/LoanOptimizerPage';
 import PaymentsPage from './pages/PaymentsPage';
+import BankSyncPage from './pages/BankSyncPage';
 
 const AppRoutes = () => {
   const { isAuthenticated } = useAuth();
@@ -90,7 +91,7 @@ const AppRoutes = () => {
       <Route
         path="/loans/optimizer"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute businessOnly>
             <Layout>
               <LoanOptimizerPage />
             </Layout>
@@ -104,6 +105,17 @@ const AppRoutes = () => {
           <ProtectedRoute>
             <Layout>
               <PaymentsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/bank-sync"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <BankSyncPage />
             </Layout>
           </ProtectedRoute>
         }

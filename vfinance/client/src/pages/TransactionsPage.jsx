@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { BarChart3, Layers3, Plus, Fingerprint, KeyRound, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
-import { startAuthentication } from '@simplewebauthn/browser';
 import api from '../api/client';
 import { formatDate, formatINR } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
+import { clearDraft, loadDraft, saveDraft } from '../utils/draftStorage';
+import { requestPaymentToken } from '../utils/paymentVerification';
 
 const donutColors = ['#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b'];
 
@@ -20,6 +21,8 @@ const emptyForm = {
 
 const TransactionsPage = () => {
   const { user } = useAuth();
+  const isBusinessUser = user?.role === 'business_user';
+  const draftScope = 'transactions-create-form-v1';
   const location = useLocation();
   const [sort, setSort] = useState('desc');
   const [transactions, setTransactions] = useState([]);
@@ -39,7 +42,6 @@ const TransactionsPage = () => {
   const [verifyPin, setVerifyPin] = useState('');
   const [verifyError, setVerifyError] = useState('');
   const [verifyBusy, setVerifyBusy] = useState(false);
-  const [fingerprintAssertion, setFingerprintAssertion] = useState(null);
   const [pendingPayload, setPendingPayload] = useState(null);
   const formCardRef = useRef(null);
   const formFirstInputRef = useRef(null);
@@ -78,13 +80,41 @@ const TransactionsPage = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('create') === '1') {
+    if (params.get('create') === '1' && !isBusinessUser) {
       setEditingId(null);
       setShowCategoryPanel(false);
       setForm(emptyForm);
       setShowForm(true);
     }
-  }, [location.search]);
+  }, [location.search, isBusinessUser]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    if (!user) return;
+    if (editingId) return;
+
+    const draft = loadDraft(draftScope, user);
+    if (!draft) return;
+
+    const hasContent = Boolean(draft.title || draft.category || draft.amount);
+    if (!hasContent) return;
+
+    setForm((prev) => ({ ...prev, ...draft }));
+  }, [showForm, user, editingId]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    if (!user) return;
+    if (editingId) return;
+
+    const hasContent = Boolean(form.title || form.category || form.amount);
+    if (!hasContent) {
+      clearDraft(draftScope, user);
+      return;
+    }
+
+    saveDraft(draftScope, user, form);
+  }, [form, user, editingId, showForm]);
 
   useEffect(() => {
     setVisibleCount(10);
@@ -165,23 +195,24 @@ const TransactionsPage = () => {
     event.preventDefault();
     setActionError('');
 
+    if (isBusinessUser) {
+      setActionError('Business accounts cannot add manual transactions. Sync bank accounts to import transaction history.');
+      return;
+    }
+
     const payload = {
       ...form,
       amount: Number(form.amount),
       date: new Date(form.date),
     };
 
-    const needsVerification =
-      !editingId &&
-      payload.type === 'expense' &&
-      (user?.requirePaymentPin || user?.requirePaymentFingerprint);
+    const needsVerification = !editingId;
 
     if (needsVerification) {
       setPendingPayload(payload);
       setVerifyOpen(true);
       setVerifyError('');
       setVerifyPin('');
-      setFingerprintAssertion(null);
       return;
     }
 
@@ -190,6 +221,7 @@ const TransactionsPage = () => {
         await api.put(`/transactions/${editingId}`, payload);
       } else {
         await api.post('/transactions', payload);
+        clearDraft(draftScope, user);
       }
 
       setForm(emptyForm);
@@ -201,39 +233,24 @@ const TransactionsPage = () => {
     }
   };
 
-  const verifyFingerprint = async () => {
-    if (verifyBusy) return;
-    setVerifyError('');
-    setVerifyBusy(true);
-    try {
-      const optionsRes = await api.get('/security/webauthn/auth-options');
-      const assertion = await startAuthentication(optionsRes.data);
-      setFingerprintAssertion(assertion);
-    } catch (requestError) {
-      setVerifyError(requestError.response?.data?.message || requestError.message || 'Fingerprint verification failed');
-    } finally {
-      setVerifyBusy(false);
-    }
-  };
-
   const confirmPayment = async () => {
     if (verifyBusy || !pendingPayload) return;
     setVerifyError('');
     setVerifyBusy(true);
     try {
-      if (user?.requirePaymentFingerprint && !fingerprintAssertion) {
-        setVerifyError('Fingerprint verification required');
+      if (!/^\d{4}$/.test(verifyPin)) {
+        setVerifyError('Please enter your 4-digit PIN');
         return;
       }
 
-      const res = await api.post('/security/verify-payment', {
-        pin: verifyPin,
-        assertion: fingerprintAssertion,
-      });
+      const paymentToken = await requestPaymentToken(verifyPin);
 
-      await api.post('/transactions', pendingPayload, {
+      await api.post('/transactions', {
+        ...pendingPayload,
+        verificationToken: paymentToken,
+      }, {
         headers: {
-          'x-payment-token': res.data.paymentToken,
+          'x-payment-token': paymentToken,
         },
       });
 
@@ -241,6 +258,7 @@ const TransactionsPage = () => {
       setPendingPayload(null);
       setForm(emptyForm);
       setShowForm(false);
+      clearDraft(draftScope, user);
       await loadData();
     } catch (requestError) {
       setVerifyError(requestError.response?.data?.message || 'Payment verification failed');
@@ -250,6 +268,11 @@ const TransactionsPage = () => {
   };
 
   const edit = (item) => {
+    if (isBusinessUser) {
+      setActionError('Business accounts cannot edit transactions manually.');
+      return;
+    }
+
     setEditingId(item._id);
     setShowCategoryPanel(false);
     setForm({
@@ -263,6 +286,11 @@ const TransactionsPage = () => {
   };
 
   const remove = async (id) => {
+    if (isBusinessUser) {
+      setActionError('Business accounts cannot delete transactions manually.');
+      return;
+    }
+
     try {
       await api.delete(`/transactions/${id}`);
       await loadData();
@@ -332,6 +360,31 @@ const TransactionsPage = () => {
         </div>
       </section>
 
+      <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${isBusinessUser ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`rounded-full px-3 py-1 text-xs font-bold ${isBusinessUser ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'}`}>
+            {isBusinessUser ? 'Business User' : 'Student'}
+          </span>
+          {isBusinessUser ? (
+            <>
+              <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-sky-700">Bank Sync Only</span>
+              <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-sky-700">Manual Create/Edit/Delete Disabled</span>
+            </>
+          ) : (
+            <>
+              <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-emerald-700">Manual Transaction Entry Enabled</span>
+              <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-emerald-700">Bank Sync Supported</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {isBusinessUser && (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700">
+          Business account mode is active: manual transaction entry is disabled. Transactions are imported through Bank Sync only.
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-12">
         <aside className="space-y-4 lg:col-span-3 lg:sticky lg:top-24 lg:self-start">
           <div className="card-soft border border-slate-100 bg-gradient-to-br from-white via-white to-emerald-50/50">
@@ -341,11 +394,16 @@ const TransactionsPage = () => {
               <button
                 type="button"
                 onClick={() => {
+                  if (isBusinessUser) {
+                    setActionError('Business accounts cannot add manual transactions. Use Bank Sync.');
+                    return;
+                  }
                   setShowCategoryPanel(false);
                   setShowForm((prev) => !prev);
                   if (!editingId && !showForm) setForm(emptyForm);
                 }}
-                className="group flex w-full items-start gap-3 rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 to-white px-3 py-3 text-left shadow-sm transition hover:shadow-md"
+                className={`group flex w-full items-start gap-3 rounded-2xl border px-3 py-3 text-left shadow-sm transition ${isBusinessUser ? 'cursor-not-allowed border-slate-200 bg-slate-100/70 opacity-70' : 'border-emerald-100 bg-gradient-to-r from-emerald-50 to-white hover:shadow-md'}`}
+                disabled={isBusinessUser}
               >
                 <span className="mt-0.5 rounded-xl bg-emerald-500/15 p-2 text-emerald-700">
                   <Plus className="h-5 w-5" />
@@ -359,10 +417,15 @@ const TransactionsPage = () => {
               <button
                 type="button"
                 onClick={() => {
+                  if (isBusinessUser) {
+                    setActionError('Business accounts do not support manual category management in Transactions.');
+                    return;
+                  }
                   setShowForm(false);
                   setShowCategoryPanel((prev) => !prev);
                 }}
-                className="group flex w-full items-start gap-3 rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50 to-white px-3 py-3 text-left shadow-sm transition hover:shadow-md"
+                className={`group flex w-full items-start gap-3 rounded-2xl border px-3 py-3 text-left shadow-sm transition ${isBusinessUser ? 'cursor-not-allowed border-slate-200 bg-slate-100/70 opacity-70' : 'border-violet-100 bg-gradient-to-r from-violet-50 to-white hover:shadow-md'}`}
+                disabled={isBusinessUser}
               >
                 <span className="mt-0.5 rounded-xl bg-violet-500/15 p-2 text-violet-700">
                   <Layers3 className="h-5 w-5" />
@@ -375,7 +438,7 @@ const TransactionsPage = () => {
             </div>
           </div>
 
-          {showCategoryPanel && (
+          {showCategoryPanel && !isBusinessUser && (
             <div className="card-soft space-y-3 border border-violet-100 bg-gradient-to-br from-white to-violet-50/40">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-slate-800">Category Manager</p>
@@ -425,7 +488,7 @@ const TransactionsPage = () => {
             </div>
           )}
 
-          {showForm && (
+          {showForm && !isBusinessUser && (
             <form ref={formCardRef} className="card-soft space-y-3 border border-slate-100 bg-gradient-to-br from-white to-cyan-50/40" onSubmit={submit}>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-slate-800">{editingId ? 'Update Transaction' : 'Add Transaction'}</p>
@@ -494,46 +557,30 @@ const TransactionsPage = () => {
                 </div>
 
                 <div className="mt-5 space-y-4">
-                  {user?.requirePaymentFingerprint && (
-                    <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <Fingerprint className="h-4 w-4 text-violet-600" />
-                          <p className="text-sm font-semibold text-slate-800">Fingerprint</p>
-                        </div>
-                        {fingerprintAssertion ? (
-                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Verified</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={verifyFingerprint}
-                            disabled={verifyBusy}
-                            className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-500 disabled:opacity-60"
-                          >
-                            Verify
-                          </button>
-                        )}
-                      </div>
-                      <p className="mt-2 text-xs text-slate-500">Use your device biometric to continue.</p>
+                  <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                    <div className="flex items-center gap-2">
+                      <Fingerprint className="h-4 w-4 text-violet-600" />
+                      <p className="text-sm font-semibold text-slate-800">Fingerprint</p>
                     </div>
-                  )}
+                    <p className="mt-2 text-xs text-slate-500">After you submit your PIN, your device fingerprint prompt will open automatically.</p>
+                  </div>
 
-                  {user?.requirePaymentPin && (
-                    <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <KeyRound className="h-4 w-4 text-amber-700" />
-                        <p className="text-sm font-semibold text-slate-800">Payment PIN</p>
-                      </div>
-                      <input
-                        className="input-soft mt-3"
-                        inputMode="numeric"
-                        placeholder="Enter PIN"
-                        value={verifyPin}
-                        onChange={(e) => setVerifyPin(e.target.value)}
-                      />
-                      <p className="mt-2 text-xs text-slate-500">Enter your 4–6 digit PIN.</p>
+                  <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                    <div className="flex items-center gap-2">
+                      <KeyRound className="h-4 w-4 text-amber-700" />
+                      <p className="text-sm font-semibold text-slate-800">Payment PIN</p>
                     </div>
-                  )}
+                    <input
+                      className="input-soft mt-3"
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={4}
+                      placeholder="Enter PIN"
+                      value={verifyPin}
+                      onChange={(e) => setVerifyPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    />
+                    <p className="mt-2 text-xs text-slate-500">Enter your 4-digit PIN.</p>
+                  </div>
 
                   {verifyError && <p className="text-sm font-semibold text-rose-600">{verifyError}</p>}
 
@@ -694,10 +741,10 @@ const TransactionsPage = () => {
                         <td className="border border-x-0 border-slate-100 px-4 py-3.5 align-middle text-slate-500 whitespace-nowrap">{formatDate(item.date)}</td>
                         <td className="rounded-r-2xl border border-l-0 border-slate-100 px-4 py-3.5 align-middle text-left">
                           <div className="flex flex-wrap items-center gap-1.5">
-                          <button onClick={() => edit(item)} className="w-fit rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
+                          <button onClick={() => edit(item)} disabled={isBusinessUser} className={`w-fit rounded-lg px-2.5 py-1 text-xs font-semibold transition ${isBusinessUser ? 'cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
                             Edit
                           </button>
-                          <button onClick={() => remove(item._id)} className="w-fit rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100">
+                          <button onClick={() => remove(item._id)} disabled={isBusinessUser} className={`w-fit rounded-lg px-2.5 py-1 text-xs font-semibold transition ${isBusinessUser ? 'cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>
                             Delete
                           </button>
                           </div>
@@ -747,10 +794,10 @@ const TransactionsPage = () => {
                         </div>
 
                         <div className="mt-3 flex items-center justify-end gap-2">
-                          <button onClick={() => edit(item)} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
+                          <button onClick={() => edit(item)} disabled={isBusinessUser} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${isBusinessUser ? 'cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
                             Edit
                           </button>
-                          <button onClick={() => remove(item._id)} className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100">
+                          <button onClick={() => remove(item._id)} disabled={isBusinessUser} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${isBusinessUser ? 'cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>
                             Delete
                           </button>
                         </div>

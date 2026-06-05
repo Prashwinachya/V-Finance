@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Fingerprint, KeyRound, HeartPulse, PiggyBank, ShieldPlus, Wallet, Plus, ArrowRight } from 'lucide-react';
-import { startAuthentication } from '@simplewebauthn/browser';
+import { HeartPulse, PiggyBank, ShieldPlus, Wallet, Plus, ArrowRight } from 'lucide-react';
 import api from '../api/client';
 import { formatDate, formatINR } from '../utils/format';
-import { useAuth } from '../context/AuthContext';
+import { requestPaymentToken } from '../utils/paymentVerification';
 
 const parseTransactionTitle = (title) => {
   const raw = String(title || '');
@@ -44,7 +43,6 @@ const typeMeta = {
 
 const WalletDetailsPage = () => {
   const { id } = useParams();
-  const { user } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [addAmount, setAddAmount] = useState('');
@@ -53,12 +51,6 @@ const WalletDetailsPage = () => {
   const [withdrawDescription, setWithdrawDescription] = useState('');
   const [actionError, setActionError] = useState('');
   const [processing, setProcessing] = useState(false);
-
-  const [verifyOpen, setVerifyOpen] = useState(false);
-  const [verifyPin, setVerifyPin] = useState('');
-  const [verifyError, setVerifyError] = useState('');
-  const [verifyBusy, setVerifyBusy] = useState(false);
-  const [fingerprintAssertion, setFingerprintAssertion] = useState(null);
 
   const loadDetails = async () => {
     const response = await api.get(`/wallets/${id}`);
@@ -89,15 +81,22 @@ const WalletDetailsPage = () => {
     setActionError('');
     setProcessing(true);
     try {
+      const pin = window.prompt('Enter your 4-digit payment PIN to add money:');
+      const paymentToken = await requestPaymentToken(pin || '');
+
       await api.post(`/wallets/${id}/add-money`, {
         amount,
         description: addDescription,
+        verificationToken: paymentToken,
+      }, {
+        headers: { 'x-payment-token': paymentToken },
       });
+
       setAddAmount('');
       setAddDescription('');
       await loadDetails();
     } catch (requestError) {
-      setActionError(requestError.response?.data?.message || 'Unable to add money right now');
+      setActionError(requestError.response?.data?.message || requestError.message || 'Unable to add money right now');
     } finally {
       setProcessing(false);
     }
@@ -122,79 +121,27 @@ const WalletDetailsPage = () => {
       return;
     }
 
-    const needsVerification = user?.requirePaymentPin || user?.requirePaymentFingerprint;
-    if (needsVerification) {
-      setVerifyOpen(true);
-      setVerifyPin('');
-      setVerifyError('');
-      setFingerprintAssertion(null);
-      return;
-    }
-
     setActionError('');
     setProcessing(true);
     try {
+      const pin = window.prompt('Enter your 4-digit payment PIN to withdraw money:');
+      const paymentToken = await requestPaymentToken(pin || '');
+
       await api.post(`/wallets/${id}/withdraw-money`, {
         amount,
         description: withdrawDescription,
+        verificationToken: paymentToken,
+      }, {
+        headers: { 'x-payment-token': paymentToken },
       });
+
       setWithdrawAmount('');
       setWithdrawDescription('');
       await loadDetails();
     } catch (requestError) {
-      setActionError(requestError.response?.data?.message || 'Unable to withdraw right now');
+      setActionError(requestError.response?.data?.message || requestError.message || 'Unable to withdraw right now');
     } finally {
       setProcessing(false);
-    }
-  };
-
-  const verifyFingerprint = async () => {
-    if (verifyBusy) return;
-    setVerifyError('');
-    setVerifyBusy(true);
-    try {
-      const optionsRes = await api.get('/security/webauthn/auth-options');
-      const assertion = await startAuthentication(optionsRes.data);
-      setFingerprintAssertion(assertion);
-    } catch (requestError) {
-      setVerifyError(requestError.response?.data?.message || requestError.message || 'Fingerprint verification failed');
-    } finally {
-      setVerifyBusy(false);
-    }
-  };
-
-  const confirmWithdraw = async () => {
-    if (verifyBusy) return;
-    setVerifyError('');
-    setVerifyBusy(true);
-    try {
-      if (user?.requirePaymentFingerprint && !fingerprintAssertion) {
-        setVerifyError('Fingerprint verification required');
-        return;
-      }
-
-      const res = await api.post('/security/verify-payment', {
-        pin: verifyPin,
-        assertion: fingerprintAssertion,
-      });
-
-      await api.post(
-        `/wallets/${id}/withdraw-money`,
-        {
-          amount: Number(withdrawAmount),
-          description: withdrawDescription,
-        },
-        { headers: { 'x-payment-token': res.data.paymentToken } }
-      );
-
-      setVerifyOpen(false);
-      setWithdrawAmount('');
-      setWithdrawDescription('');
-      loadDetails();
-    } catch (requestError) {
-      setVerifyError(requestError.response?.data?.message || 'Payment verification failed');
-    } finally {
-      setVerifyBusy(false);
     }
   };
 
@@ -213,75 +160,6 @@ const WalletDetailsPage = () => {
 
   return (
     <div className="space-y-6">
-      {verifyOpen && (
-        <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/30 px-4">
-          <div className="w-full max-w-md rounded-3xl border border-white/60 bg-white/95 p-6 shadow-xl shadow-pink-100 backdrop-blur">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-base font-bold text-slate-900">Payment Verification</p>
-                <p className="mt-1 text-sm text-slate-500">Complete Fingerprint + PIN to withdraw</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setVerifyOpen(false)}
-                className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="mt-5 space-y-4">
-              {user?.requirePaymentFingerprint && (
-                <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Fingerprint className="h-4 w-4 text-violet-600" />
-                      <p className="text-sm font-semibold text-slate-800">Fingerprint</p>
-                    </div>
-                    {fingerprintAssertion ? (
-                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Verified</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={verifyFingerprint}
-                        disabled={verifyBusy}
-                        className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-500 disabled:opacity-60"
-                      >
-                        Verify
-                      </button>
-                    )}
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">Use your device biometric to continue.</p>
-                </div>
-              )}
-
-              {user?.requirePaymentPin && (
-                <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="flex items-center gap-2">
-                    <KeyRound className="h-4 w-4 text-amber-700" />
-                    <p className="text-sm font-semibold text-slate-800">Payment PIN</p>
-                  </div>
-                  <input
-                    className="input-soft mt-3"
-                    inputMode="numeric"
-                    placeholder="Enter PIN"
-                    value={verifyPin}
-                    onChange={(e) => setVerifyPin(e.target.value)}
-                  />
-                  <p className="mt-2 text-xs text-slate-500">Enter your 4–6 digit PIN.</p>
-                </div>
-              )}
-
-              {verifyError && <p className="text-sm font-semibold text-rose-600">{verifyError}</p>}
-
-              <button type="button" onClick={confirmWithdraw} disabled={verifyBusy} className="btn-gradient w-full">
-                {verifyBusy ? 'Verifying…' : 'Verify & Withdraw'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <section className="rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 text-white shadow-soft">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>

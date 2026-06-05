@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarRange, IndianRupee, MapPin, Pencil, Plane, Plus, Sparkles, Trash2, Users, X } from 'lucide-react';
 import api from '../api/client';
 import { formatDate, formatINR } from '../utils/format';
+import { useAuth } from '../context/AuthContext';
+import { clearDraft, loadDraft, saveDraft } from '../utils/draftStorage';
 
 const baseForm = {
   budgetName: '',
@@ -56,6 +58,8 @@ const fieldSoftClasses = {
 };
 
 const TripPlannerPage = () => {
+  const { user } = useAuth();
+  const draftScope = 'trip-planner-form-v1';
   const [form, setForm] = useState(baseForm);
   const [trips, setTrips] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -83,6 +87,41 @@ const TripPlannerPage = () => {
     return () => window.cancelAnimationFrame(frameId);
   }, [showPlannerForm]);
 
+  useEffect(() => {
+    if (!showPlannerForm) return;
+    if (!user) return;
+    if (editingId) return;
+
+    const draft = loadDraft(draftScope, user);
+    if (!draft) return;
+
+    const hasContent = Boolean(draft.budgetName || draft.destination || draft.amount);
+    if (!hasContent) return;
+
+    setForm((prev) => ({
+      ...prev,
+      ...draft,
+      breakdown: {
+        ...prev.breakdown,
+        ...(draft.breakdown || {}),
+      },
+    }));
+  }, [showPlannerForm, user, editingId]);
+
+  useEffect(() => {
+    if (!showPlannerForm) return;
+    if (!user) return;
+    if (editingId) return;
+
+    const hasContent = Boolean(form.budgetName || form.destination || form.amount);
+    if (!hasContent) {
+      clearDraft(draftScope, user);
+      return;
+    }
+
+    saveDraft(draftScope, user, form);
+  }, [form, user, editingId, showPlannerForm]);
+
   const submit = async (event) => {
     event.preventDefault();
     setError('');
@@ -100,6 +139,7 @@ const TripPlannerPage = () => {
         await api.put(`/trips/${editingId}`, payload);
       } else {
         await api.post('/trips', payload);
+        clearDraft(draftScope, user);
       }
 
       setEditingId(null);
@@ -133,6 +173,7 @@ const TripPlannerPage = () => {
     setForm(baseForm);
     setShowPlannerForm(false);
     setError('');
+    clearDraft(draftScope, user);
   };
 
   const summary = useMemo(
@@ -163,10 +204,10 @@ const TripPlannerPage = () => {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-rose-500 p-6 text-white shadow-soft">
+      <section className="rounded-3xl bg-gradient-to-r from-rose-700 via-red-600 to-orange-500 p-6 text-white shadow-soft">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+            <div className="inline-flex items-center gap-2 rounded-full border border-rose-200/40 bg-rose-300/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-rose-50">
               <Sparkles className="h-3.5 w-3.5" />
               Smart Trip Planner
             </div>
@@ -187,7 +228,7 @@ const TripPlannerPage = () => {
                 setShowPlannerForm(true);
               }
             }}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-fuchsia-700 shadow-lg shadow-fuchsia-300/30 transition hover:bg-fuchsia-50"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-rose-700 shadow-lg shadow-rose-300/30 transition hover:bg-rose-50"
           >
             {showPlannerForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             {showPlannerForm ? 'Close Create' : 'Create Trip Budget'}

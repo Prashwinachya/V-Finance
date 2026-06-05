@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import api from '../api/client';
 import { formatINR } from '../utils/format';
+import { useAuth } from '../context/AuthContext';
+import { clearDraft, loadDraft, saveDraft } from '../utils/draftStorage';
 
 const emptyLoanForm = {
   name: '',
@@ -32,6 +34,8 @@ const formatCompactINR = (value = 0) => new Intl.NumberFormat('en-IN', {
 }).format(Number(value || 0));
 
 const LoanOptimizerPage = () => {
+  const { user } = useAuth();
+  const draftScope = 'loan-optimizer-form-v1';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [extraMonthly, setExtraMonthly] = useState(2000);
@@ -68,6 +72,34 @@ const LoanOptimizerPage = () => {
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [showForm]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    if (!user) return;
+    if (editingId) return;
+
+    const draft = loadDraft(draftScope, user);
+    if (!draft) return;
+
+    const hasContent = Boolean(draft.name || draft.lender || draft.annualRate || draft.remainingPrincipal || draft.emi || draft.notes);
+    if (!hasContent) return;
+
+    setLoanForm((prev) => ({ ...prev, ...draft }));
+  }, [showForm, user, editingId]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    if (!user) return;
+    if (editingId) return;
+
+    const hasContent = Boolean(loanForm.name || loanForm.lender || loanForm.annualRate || loanForm.remainingPrincipal || loanForm.emi || loanForm.notes);
+    if (!hasContent) {
+      clearDraft(draftScope, user);
+      return;
+    }
+
+    saveDraft(draftScope, user, loanForm);
+  }, [loanForm, user, editingId, showForm]);
 
   const loans = useMemo(() => summary?.loans || [], [summary]);
   const overview = summary?.overview || {
@@ -130,6 +162,7 @@ const LoanOptimizerPage = () => {
         await api.put(`/loans/${editingId}`, payload);
       } else {
         await api.post('/loans', payload);
+        clearDraft(draftScope, user);
       }
 
       setShowForm(false);
@@ -159,10 +192,10 @@ const LoanOptimizerPage = () => {
 
   return (
     <div className="space-y-5 animate-dashboard-in">
-      <section className="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-900 to-violet-900 p-6 text-white shadow-soft">
+      <section className="rounded-3xl bg-gradient-to-r from-slate-800 via-slate-700 to-blue-700 p-6 text-white shadow-soft">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/35 bg-slate-300/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-100">
               <Sparkles className="h-3.5 w-3.5" />
               Smart EMI & Loan Optimizer
             </div>
@@ -236,7 +269,7 @@ const LoanOptimizerPage = () => {
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-200 hover:from-indigo-500 hover:to-violet-500"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-slate-700 to-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-slate-300 hover:from-slate-600 hover:to-blue-600"
           >
             <Plus className="h-4 w-4" />
             Add Loan

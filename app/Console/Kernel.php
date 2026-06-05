@@ -12,7 +12,13 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        if ((bool) env('DATA_BACKUP_ENABLED', true)) {
+            $keepDays = max(1, (int) env('DATA_BACKUP_KEEP_DAYS', 30));
+            $schedule
+                ->command('data:backup --keep-days='.$keepDays)
+                ->dailyAt('02:30')
+                ->withoutOverlapping();
+        }
     }
 
     /**

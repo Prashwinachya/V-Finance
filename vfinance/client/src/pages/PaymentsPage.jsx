@@ -17,6 +17,9 @@ import {
 } from 'lucide-react';
 import api from '../api/client';
 import { formatDate, formatINR } from '../utils/format';
+import { useAuth } from '../context/AuthContext';
+import { clearDraft, loadDraft, saveDraft } from '../utils/draftStorage';
+import { requestPaymentToken } from '../utils/paymentVerification';
 
 const kindOptions = [
   { value: 'subscription', label: 'Subscription' },
@@ -49,6 +52,8 @@ const statusMeta = {
 };
 
 const PaymentsPage = () => {
+  const { user } = useAuth();
+  const draftScope = 'payments-form-v1';
   const location = useLocation();
 
   const [loading, setLoading] = useState(true);
@@ -181,6 +186,34 @@ const PaymentsPage = () => {
     return () => window.cancelAnimationFrame(frameId);
   }, [showForm]);
 
+  useEffect(() => {
+    if (!showForm) return;
+    if (!user) return;
+    if (editingId) return;
+
+    const draft = loadDraft(draftScope, user);
+    if (!draft) return;
+
+    const hasContent = Boolean(draft.title || draft.payee || draft.amount || draft.dueDay || draft.notes);
+    if (!hasContent) return;
+
+    setForm((prev) => ({ ...prev, ...draft }));
+  }, [showForm, user, editingId]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    if (!user) return;
+    if (editingId) return;
+
+    const hasContent = Boolean(form.title || form.payee || form.amount || form.dueDay || form.notes);
+    if (!hasContent) {
+      clearDraft(draftScope, user);
+      return;
+    }
+
+    saveDraft(draftScope, user, form);
+  }, [form, user, editingId, showForm]);
+
   const grouped = useMemo(() => {
     const items = overview.payments || [];
     return {
@@ -227,6 +260,7 @@ const PaymentsPage = () => {
         await api.put(`/payments/${editingId}`, payload);
       } else {
         await api.post('/payments', payload);
+        clearDraft(draftScope, user);
       }
 
       setShowForm(false);
@@ -253,10 +287,14 @@ const PaymentsPage = () => {
 
   const payNow = async (id, amount) => {
     try {
-      await api.post(`/payments/${id}/pay-now`, { amount });
+      const pin = window.prompt('Enter your 4-digit payment PIN to continue payment:');
+      const paymentToken = await requestPaymentToken(pin || '');
+      await api.post(`/payments/${id}/pay-now`, { amount, verificationToken: paymentToken }, {
+        headers: { 'x-payment-token': paymentToken },
+      });
       await loadOverview();
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Unable to complete payment.');
+      setError(requestError.response?.data?.message || requestError.message || 'Unable to complete payment.');
     }
   };
 
@@ -265,16 +303,22 @@ const PaymentsPage = () => {
     setError('');
 
     try {
+      const pin = window.prompt('Enter your 4-digit payment PIN to continue payment:');
+      const paymentToken = await requestPaymentToken(pin || '');
+
       await api.post('/payments/scan-pay', {
         code: scanCode,
         amount: Number(scanAmount),
+        verificationToken: paymentToken,
+      }, {
+        headers: { 'x-payment-token': paymentToken },
       });
       setScanCode('');
       setScanAmount('');
       await loadOverview();
       setScannerOpen(false);
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Unable to process scan payment.');
+      setError(requestError.response?.data?.message || requestError.message || 'Unable to process scan payment.');
     } finally {
       setScanBusy(false);
     }
@@ -475,62 +519,83 @@ const PaymentsPage = () => {
         </div>
 
         <div className="xl:col-span-2 space-y-4">
-          <div className="card-soft border border-indigo-100 bg-gradient-to-br from-white to-indigo-50/60">
-            <div className="mb-3 flex items-center justify-between">
+          <div className="card-soft border border-indigo-100 bg-[radial-gradient(circle_at_12%_8%,rgba(99,102,241,0.12),transparent_38%),radial-gradient(circle_at_88%_18%,rgba(236,72,153,0.12),transparent_34%),linear-gradient(to_bottom_right,#ffffff,#eef2ff)]">
+            <div className="mb-4 flex items-center justify-between gap-3">
               <div className="inline-flex items-center gap-2">
-                <QrCode className="h-4 w-4 text-indigo-600" />
-                <p className="text-sm font-semibold text-slate-800">Scan & Pay</p>
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-100 text-indigo-700">
+                  <QrCode className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Scan & Pay</p>
+                  <p className="text-xs text-slate-500">Instant UPI-style payment from leftover balance</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setScannerOpen((prev) => !prev)}
-                className={`rounded-xl px-3 py-2 text-xs font-semibold ${scannerOpen ? 'bg-rose-100 text-rose-700' : 'bg-indigo-100 text-indigo-700'}`}
+                className={`rounded-xl px-3 py-2 text-xs font-semibold shadow-sm ${scannerOpen ? 'bg-rose-100 text-rose-700 ring-1 ring-rose-200' : 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200'}`}
               >
                 {scannerOpen ? 'Stop Scanner' : 'Start Scanner'}
               </button>
             </div>
 
-            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-black/90">
-              <video ref={videoRef} className="h-52 w-full object-cover" muted playsInline />
-              {!scannerOpen && (
-                <div className="absolute inset-0 grid place-items-center text-center text-white/80">
-                  <div>
-                    <ScanLine className="mx-auto h-6 w-6" />
-                    <p className="mt-2 text-xs">Camera scanner is off</p>
+            <div className="grid gap-4 lg:grid-cols-5">
+              <div className="lg:col-span-3">
+                <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-black/90">
+                  <video ref={videoRef} className="h-56 w-full object-cover" muted playsInline />
+                  <div className="pointer-events-none absolute inset-x-6 inset-y-8 rounded-2xl border border-white/35" />
+                  {!scannerOpen && (
+                    <div className="absolute inset-0 grid place-items-center text-center text-white/80">
+                      <div>
+                        <ScanLine className="mx-auto h-6 w-6" />
+                        <p className="mt-2 text-xs">Camera scanner is off</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">Center the QR in frame for auto-read</p>
+              </div>
+
+              <div className="lg:col-span-2">
+                <div className="rounded-2xl border border-white/70 bg-white/85 p-3 backdrop-blur-sm">
+                  <div className="space-y-3">
+                    <div>
+                      <label htmlFor="scan-code" className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Scanned Code / QR Data</label>
+                      <textarea
+                        id="scan-code"
+                        className="input-soft w-full min-h-[92px]"
+                        value={scanCode}
+                        onChange={(event) => setScanCode(event.target.value)}
+                        placeholder="Scan or paste code here"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="scan-amount" className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Amount to Pay</label>
+                      <input
+                        id="scan-amount"
+                        className="input-soft w-full"
+                        type="number"
+                        min="1"
+                        step="0.01"
+                        value={scanAmount}
+                        onChange={(event) => setScanAmount(event.target.value)}
+                        placeholder="Enter amount"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={scanBusy || !scanCode.trim() || Number(scanAmount) <= 0}
+                      onClick={scanAndPay}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-200 hover:from-indigo-500 hover:via-violet-500 hover:to-fuchsia-500 disabled:opacity-60"
+                    >
+                      <Wallet className="h-4 w-4" />
+                      {scanBusy ? 'Processing...' : 'Pay from Leftover Balance'}
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
-
-            <div className="mt-3 space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Scanned Code / QR Data</label>
-              <textarea
-                className="input-soft min-h-[88px]"
-                value={scanCode}
-                onChange={(event) => setScanCode(event.target.value)}
-                placeholder="Real-time scanned code will appear here, or paste manually"
-              />
-
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Amount to Pay</label>
-              <input
-                className="input-soft"
-                type="number"
-                min="1"
-                step="0.01"
-                value={scanAmount}
-                onChange={(event) => setScanAmount(event.target.value)}
-                placeholder="Enter amount"
-              />
-
-              <button
-                type="button"
-                disabled={scanBusy || !scanCode.trim() || Number(scanAmount) <= 0}
-                onClick={scanAndPay}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-200 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-60"
-              >
-                <Wallet className="h-4 w-4" />
-                {scanBusy ? 'Processing...' : 'Pay from Leftover Balance'}
-              </button>
+              </div>
             </div>
           </div>
 

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Wallet as WalletIcon, Info, CircleDollarSign, HeartPulse, ShieldPlus, PiggyBank, Plus } from 'lucide-react';
 import api from '../api/client';
 import { formatINR } from '../utils/format';
+import { useAuth } from '../context/AuthContext';
 
 const walletTypes = [
   {
@@ -35,12 +36,33 @@ const walletTypes = [
 ];
 
 const typeMeta = Object.fromEntries(walletTypes.map((item) => [item.value, item]));
+const maxWallets = 8;
+const studentWalletType = 'pocket_saver_wallet';
 
 const WalletsPage = () => {
+  const { user } = useAuth();
+  const interfaceRole = user?.portalRole || user?.role;
+  const isStudent = ['student', 'user'].includes(interfaceRole);
   const [wallets, setWallets] = useState([]);
-  const [walletType, setWalletType] = useState('travelling_wallet');
+  const [walletType, setWalletType] = useState(studentWalletType);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const availableWalletTypes = useMemo(() => {
+    if (isStudent) {
+      return walletTypes.filter((item) => item.value === studentWalletType);
+    }
+
+    return walletTypes;
+  }, [isStudent]);
+
+  useEffect(() => {
+    if (isStudent && walletType !== studentWalletType) {
+      setWalletType(studentWalletType);
+    }
+  }, [isStudent, walletType]);
+
+  const effectiveMaxWallets = isStudent ? 1 : maxWallets;
 
   const loadWallets = async () => {
     const response = await api.get('/wallets');
@@ -66,12 +88,8 @@ const WalletsPage = () => {
     [wallets]
   );
 
-  const canCreateMore = wallets.length < 3;
-  const selectedMeta = typeMeta[walletType] || typeMeta.travelling_wallet;
-  const createdWalletTypes = useMemo(
-    () => new Set(wallets.map((wallet) => wallet.walletType === 'personal_wallet' ? 'travelling_wallet' : wallet.walletType)),
-    [wallets]
-  );
+  const canCreateMore = wallets.length < effectiveMaxWallets;
+  const selectedMeta = typeMeta[walletType] || typeMeta[studentWalletType];
 
   const formatINRPrecise = (amount = 0) => {
     return new Intl.NumberFormat('en-IN', {
@@ -90,15 +108,11 @@ const WalletsPage = () => {
 
     try {
       if (!canCreateMore) {
-        setError('Maximum 3 wallets allowed per user.');
-        return;
-      }
-      if (createdWalletTypes.has(walletType)) {
-        setError('Only one wallet is allowed for each type.');
+        setError(`Maximum ${effectiveMaxWallets} wallets can be activated per user.`);
         return;
       }
       await api.post('/wallets', { walletType });
-      setWalletType('travelling_wallet');
+      setWalletType(isStudent ? studentWalletType : walletType);
       await loadWallets();
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to save wallet right now');
@@ -131,9 +145,15 @@ const WalletsPage = () => {
 
         <div className="hidden items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500 sm:inline-flex">
           <Info className="h-4 w-4" />
-          {wallets.length}/3 wallets created
+          {wallets.length}/{effectiveMaxWallets} wallets active
         </div>
       </div>
+
+      {isStudent && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+          Student wallet policy: only one Pocket Saver Wallet is allowed. Travelling and Medical Emergency wallets are unavailable.
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 p-6 shadow-soft">
@@ -165,32 +185,29 @@ const WalletsPage = () => {
       {canCreateMore ? (
         <form onSubmit={submit} className="card-soft space-y-4 motion-safe:transition-all motion-safe:duration-300">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-slate-700">Create Wallet</p>
+            <p className="text-sm font-semibold text-slate-700">Activate Wallets</p>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-12">
             <div className="lg:col-span-9">
               <div className="grid gap-2 sm:grid-cols-3">
-                {walletTypes.map((item) => {
+                {availableWalletTypes.map((item) => {
                   const Icon = item.icon;
                   const selected = walletType === item.value;
-                  const alreadyCreated = createdWalletTypes.has(item.value);
                   return (
                     <button
                       key={item.value}
                       type="button"
-                      disabled={alreadyCreated}
                       onClick={() => setWalletType(item.value)}
                       className={`rounded-xl border px-3 py-2 text-left transition ${
                         selected
                           ? `border-transparent bg-gradient-to-r ${item.accent} text-white shadow-md`
                           : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                      } ${alreadyCreated ? 'cursor-not-allowed opacity-50' : ''}`}
+                      }`}
                     >
                       <div className="inline-flex items-center gap-2 text-xs font-semibold">
                         <Icon className="h-4 w-4" />
                         {item.label.replace(' Wallet', '')}
-                        {alreadyCreated ? ' ✓' : ''}
                       </div>
                     </button>
                   );
@@ -205,7 +222,7 @@ const WalletsPage = () => {
               disabled={submitting || !canCreateMore}
             >
               <Plus className="h-4 w-4" />
-              {submitting ? 'Saving...' : 'Create Wallet'}
+              {submitting ? 'Activating...' : 'Activate Wallets'}
             </button>
           </div>
 
@@ -213,7 +230,11 @@ const WalletsPage = () => {
         </form>
       ) : (
         <div className="card-soft border-amber-100 bg-amber-50">
-            <p className="text-sm font-semibold text-amber-800">Only 3 wallets can be created.</p>
+            <p className="text-sm font-semibold text-amber-800">
+              {isStudent
+                ? 'Student accounts can keep only one Pocket Saver Wallet active.'
+                : 'Up to 8 wallets can be active at a time.'}
+            </p>
         </div>
       )}
 
@@ -287,8 +308,8 @@ const WalletsPage = () => {
 
         {!wallets.length && (
           <div className="card-soft border-dashed border-slate-200 text-center md:col-span-2 xl:col-span-3">
-            <p className="text-base font-semibold text-slate-700">No wallets yet</p>
-            <p className="mt-1 text-sm text-slate-500">Create your first wallet by selecting a wallet type.</p>
+            <p className="text-base font-semibold text-slate-700">No wallets activated yet</p>
+            <p className="mt-1 text-sm text-slate-500">Activate your first wallet by selecting a wallet type.</p>
           </div>
         )}
       </div>

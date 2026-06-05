@@ -1,11 +1,6 @@
 <?php
 
-use App\Http\Controllers\BudgetController;
-use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\SubscriptionRadarController;
-use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\SpaController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -19,19 +14,12 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', fn () => redirect()->route('dashboard'));
+Route::get('/uploads/{path}', function (string $path) {
+    $filePath = public_path('uploads/'.$path);
 
-Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    abort_unless(is_file($filePath), 404);
 
-    Route::resource('transactions', TransactionController::class)->except('show');
-    Route::resource('categories', CategoryController::class)->except('show');
-    Route::resource('budgets', BudgetController::class)->except('show');
-    Route::get('/subscriptions/radar', [SubscriptionRadarController::class, 'index'])->name('subscriptions.radar');
+    return response()->file($filePath);
+})->where('path', '.*');
 
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
-
-require __DIR__.'/auth.php';
+Route::get('/{any?}', SpaController::class)->where('any', '^(?!api).*$');

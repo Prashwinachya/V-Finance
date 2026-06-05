@@ -174,10 +174,10 @@ const SubscriptionRadarPage = () => {
 
   return (
     <div className="space-y-5 animate-dashboard-in">
-      <div className="rounded-3xl bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-rose-500 p-6 text-white shadow-soft">
+      <div className="rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 p-6 text-white shadow-soft">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200/45 bg-emerald-300/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-50">
               <Sparkles className="h-3.5 w-3.5" />
               Smart Subscription Radar
             </div>

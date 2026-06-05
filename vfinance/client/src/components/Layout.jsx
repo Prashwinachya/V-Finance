@@ -1,9 +1,9 @@
-import { ChevronDown, LayoutDashboard, Receipt, Plane, Wallet, ShieldCheck, Landmark, Settings, Radar, Coins, CreditCard } from 'lucide-react';
+import { ChevronDown, LayoutDashboard, Receipt, Plane, Wallet, ShieldCheck, Landmark, Settings, Radar, Coins, CreditCard, Building2 } from 'lucide-react';
 import { Link, NavLink } from 'react-router-dom';
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
-const apiOrigin = String(import.meta.env.VITE_API_URL || 'http://localhost:5050/api').replace(/\/api\/?$/, '');
+import UserAvatar from './UserAvatar';
 
 const menu = [
   {
@@ -24,36 +24,43 @@ const menu = [
     label: 'Trip Planner',
     path: '/trip-planner',
     icon: Plane,
-    activeClass: 'bg-violet-500 text-white',
-    activeShadow: 'shadow-md shadow-violet-200',
+    activeClass: 'bg-gradient-to-r from-rose-600 to-red-500 text-white',
+    activeShadow: 'shadow-md shadow-rose-200',
   },
   {
     label: 'Smart Radar',
     path: '/subscriptions/radar',
     icon: Radar,
-    activeClass: 'bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white',
-    activeShadow: 'shadow-md shadow-fuchsia-200',
+    activeClass: 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white',
+    activeShadow: 'shadow-md shadow-emerald-200',
   },
   {
     label: 'Loan Optimizer',
     path: '/loans/optimizer',
     icon: Coins,
-    activeClass: 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white',
-    activeShadow: 'shadow-md shadow-indigo-200',
+    activeClass: 'bg-gradient-to-r from-slate-700 to-blue-700 text-white',
+    activeShadow: 'shadow-md shadow-slate-300',
   },
   {
     label: 'Payments',
     path: '/payments',
     icon: CreditCard,
-    activeClass: 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white',
-    activeShadow: 'shadow-md shadow-fuchsia-200',
+    activeClass: 'bg-gradient-to-r from-fuchsia-600 to-rose-500 text-white',
+    activeShadow: 'shadow-md shadow-rose-200',
   },
   {
     label: 'Wallets',
     path: '/wallets',
     icon: Wallet,
-    activeClass: 'bg-emerald-500 text-white',
-    activeShadow: 'shadow-md shadow-emerald-200',
+    activeClass: 'bg-gradient-to-r from-green-500 to-lime-500 text-white',
+    activeShadow: 'shadow-md shadow-lime-200',
+  },
+  {
+    label: 'Bank Sync',
+    path: '/bank-sync',
+    icon: Building2,
+    activeClass: 'bg-gradient-to-r from-cyan-600 to-blue-700 text-white',
+    activeShadow: 'shadow-md shadow-cyan-200',
   },
   {
     label: 'Admin',
@@ -66,13 +73,46 @@ const menu = [
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
+  const interfaceRole = user?.portalRole || user?.role;
+  const roleBadgeLabel = interfaceRole === 'business_user' ? 'Business Badge' : 'Student Badge';
+  const roleBadgeClass = interfaceRole === 'business_user'
+    ? 'border-cyan-200 bg-cyan-50 text-cyan-700'
+    : 'border-emerald-200 bg-emerald-50 text-emerald-700';
   const [open, setOpen] = useState(false);
-  const navItems = menu.filter((item) => ['admin', 'super_admin'].includes(user?.role) || item.path !== '/admin');
+  const location = useLocation();
+  const navItems = menu.filter((item) => {
+    const isAdminRoute = item.path === '/admin';
+    if (isAdminRoute && !['admin', 'super_admin'].includes(user?.role)) {
+      return false;
+    }
+
+    const isLoanOptimizerRoute = item.path === '/loans/optimizer';
+    if (isLoanOptimizerRoute && interfaceRole !== 'business_user') {
+      return false;
+    }
+
+    return true;
+  });
+
+  const routeAccent = (() => {
+    const path = location.pathname;
+    if (path.startsWith('/transactions')) return 'from-emerald-500 to-teal-500';
+    if (path.startsWith('/trip-planner')) return 'from-rose-600 to-red-500';
+    if (path.startsWith('/subscriptions/radar')) return 'from-teal-500 to-emerald-500';
+    if (path.startsWith('/loans/optimizer')) return 'from-slate-700 to-blue-700';
+    if (path.startsWith('/payments')) return 'from-fuchsia-600 to-rose-500';
+    if (path.startsWith('/bank-sync')) return 'from-cyan-600 to-blue-700';
+    if (path.startsWith('/wallets')) return 'from-emerald-500 to-lime-500';
+    if (path.startsWith('/admin')) return 'from-rose-500 to-pink-600';
+    if (path.startsWith('/settings')) return 'from-slate-600 to-slate-800';
+    return 'from-pink-500 to-violet-600';
+  })();
 
   return (
     <div className="min-h-screen bg-rose-50/80">
       <header className="sticky top-0 z-20 px-3 pb-2 pt-2">
         <nav className="mx-auto flex w-full max-w-[1220px] flex-wrap items-center gap-3 rounded-2xl border border-slate-100 bg-white/95 px-3 py-2.5 shadow-soft backdrop-blur-xl sm:px-4">
+          <span className={`h-1 w-full rounded-full bg-gradient-to-r ${routeAccent}`} />
           <Link to="/" className="order-1 inline-flex shrink-0 items-center gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-pink-500 to-purple-500 text-white shadow-md shadow-pink-200">
               <Landmark size={18} />
@@ -107,24 +147,21 @@ const Layout = ({ children }) => {
           </div>
 
           <div className="relative order-2 ml-auto shrink-0">
-            <button
-              onClick={() => setOpen((prev) => !prev)}
-              className="inline-flex max-w-[220px] items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm"
-            >
-              {user?.avatarUrl ? (
-                <img
-                  src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${apiOrigin}${user.avatarUrl}`}
-                  alt="Avatar"
-                  className="h-8 w-8 rounded-full object-cover"
-                />
-              ) : (
-                <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-r from-fuchsia-500 to-violet-500 text-sm font-bold text-white">
-                  {user?.name?.[0] || 'U'}
-                </div>
-              )}
-              <span className="hidden max-w-[130px] truncate pr-1 text-sm font-semibold text-slate-600 sm:inline">{user?.name || 'User'}</span>
-              <ChevronDown size={16} className="text-slate-500" />
-            </button>
+            <div className="flex items-center gap-2">
+              <span className={`hidden sm:inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${roleBadgeClass}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {roleBadgeLabel}
+              </span>
+
+              <button
+                onClick={() => setOpen((prev) => !prev)}
+                className="inline-flex max-w-[220px] items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm"
+              >
+                <UserAvatar user={user} size="h-8 w-8" textSize="text-sm" />
+                <span className="hidden max-w-[130px] truncate pr-1 text-sm font-semibold text-slate-600 sm:inline">{user?.name || 'User'}</span>
+                <ChevronDown size={16} className="text-slate-500" />
+              </button>
+            </div>
 
             {open && (
               <div className="absolute right-0 mt-2 w-52 rounded-xl border border-slate-100 bg-white p-2 shadow-lg">
@@ -153,6 +190,7 @@ const Layout = ({ children }) => {
 
       <footer className="mx-auto w-full max-w-[1220px] px-3 pb-6 sm:px-4">
         <div className="rounded-2xl border border-slate-100 bg-white/80 px-4 py-3 text-center text-xs font-semibold text-slate-500 shadow-sm backdrop-blur">
+          <span className={`mb-2 block h-0.5 w-full rounded-full bg-gradient-to-r ${routeAccent}`} />
           © {new Date().getFullYear()} Prashwin. All rights reserved.
         </div>
       </footer>

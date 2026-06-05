@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
@@ -12,88 +13,104 @@ class ProfileTest extends TestCase
 
     public function test_profile_page_is_displayed(): void
     {
-        $user = User::factory()->create();
+        $response = $this->get('/settings');
 
-        $response = $this
-            ->actingAs($user)
-            ->get('/profile');
-
-        $response->assertOk();
+        $response->assertStatus(200);
     }
 
     public function test_profile_information_can_be_updated(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'password' => bcrypt('password123'),
+        ]);
 
-        $response = $this
-            ->actingAs($user)
-            ->patch('/profile', [
+        $token = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+        ])->json('token');
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/user/profile', [
                 'name' => 'Test User',
                 'email' => 'test@example.com',
             ]);
 
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect('/profile');
+        $response->assertOk();
 
         $user->refresh();
 
         $this->assertSame('Test User', $user->name);
         $this->assertSame('test@example.com', $user->email);
-        $this->assertNull($user->email_verified_at);
     }
 
-    public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged(): void
+    public function test_avatar_can_be_uploaded_for_authenticated_user(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'password' => bcrypt('password123'),
+        ]);
 
-        $response = $this
-            ->actingAs($user)
-            ->patch('/profile', [
-                'name' => 'Test User',
-                'email' => $user->email,
+        $token = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+        ])->json('token');
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->post('/api/user/avatar', [
+                'avatar' => UploadedFile::fake()->image('avatar.jpg', 300, 300),
             ]);
 
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect('/profile');
+        $response->assertOk()
+            ->assertJsonStructure(['avatarUrl', 'user' => ['id', 'avatarUrl']]);
 
-        $this->assertNotNull($user->refresh()->email_verified_at);
+        $this->assertNotNull($user->fresh()->avatar_url);
     }
 
-    public function test_user_can_delete_their_account(): void
+    public function test_user_security_preferences_can_be_updated(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'password' => bcrypt('password123'),
+            'payment_pin_enabled' => true,
+            'payment_pin_hash' => bcrypt('1234'),
+        ]);
 
-        $response = $this
-            ->actingAs($user)
-            ->delete('/profile', [
-                'password' => 'password',
+        $token = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+        ])->json('token');
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/user/security', [
+                'requirePaymentPin' => true,
+                'requirePaymentFingerprint' => false,
             ]);
 
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect('/');
+        $response->assertOk();
 
-        $this->assertGuest();
-        $this->assertNull($user->fresh());
+        $user->refresh();
+        $this->assertTrue($user->require_payment_pin);
+        $this->assertFalse($user->require_payment_fingerprint);
     }
 
-    public function test_correct_password_must_be_provided_to_delete_account(): void
+    public function test_payment_pin_requires_confirmation_when_provided(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'password' => bcrypt('password123'),
+        ]);
 
-        $response = $this
-            ->actingAs($user)
-            ->from('/profile')
-            ->delete('/profile', [
-                'password' => 'wrong-password',
+        $token = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+        ])->json('token');
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/user/pin', [
+                'pin' => '1234',
+                'confirmPin' => '9999',
             ]);
 
-        $response
-            ->assertSessionHasErrorsIn('userDeletion', 'password')
-            ->assertRedirect('/profile');
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['confirmPin']);
 
-        $this->assertNotNull($user->fresh());
+        $this->assertFalse((bool) $user->fresh()->payment_pin_enabled);
     }
 }
