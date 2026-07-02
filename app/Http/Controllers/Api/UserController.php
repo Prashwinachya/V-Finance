@@ -70,15 +70,99 @@ class UserController extends Controller
             'avatar_url' => $newRelativePath,
         ])->save();
 
-        // Delete old avatar only after the new file path is persisted.
+        // Backup old avatar before removing it. Keep a copy in storage/app/avatars_backups/{userId}
         if ($previousFile && is_file($previousFile) && $newRelativePath !== $previousRelativePath) {
-            @unlink($previousFile);
+            try {
+                $backupDir = storage_path('app/avatars_backups/'.$user->id);
+                if (! is_dir($backupDir)) {
+                    mkdir($backupDir, 0755, true);
+                }
+                $backupName = date('Ymd_His').'__'.basename($previousFile);
+                @copy($previousFile, $backupDir.DIRECTORY_SEPARATOR.$backupName);
+                // Only delete the old file after successful copy (best-effort)
+                if (is_file($backupDir.DIRECTORY_SEPARATOR.$backupName)) {
+                    @unlink($previousFile);
+                }
+            } catch (\Throwable $e) {
+                // If backup fails, do not interrupt avatar update — log and continue.
+                // Using @ to avoid throwing from production code here.
+            }
         }
 
         return response()->json([
             'avatarUrl' => $user->avatar_url,
             'user' => ApiTransformer::user($user),
         ]);
+    }
+
+    public function listAvatarBackups(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $backupDir = storage_path('app/avatars_backups/'.$user->id);
+        $backups = [];
+
+        if (is_dir($backupDir)) {
+            $files = array_values(array_filter(scandir($backupDir), fn($f) => ! in_array($f, ['.', '..'])));
+            foreach ($files as $file) {
+                $path = $backupDir.DIRECTORY_SEPARATOR.$file;
+                if (is_file($path)) {
+                    $backups[] = [
+                        'filename' => $file,
+                        'size' => filesize($path),
+                        'modifiedAt' => date('c', filemtime($path)),
+                    ];
+                }
+            }
+        }
+
+        return response()->json(['backups' => $backups]);
+    }
+
+    public function restoreAvatarBackup(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'filename' => ['required', 'string'],
+        ]);
+
+        $user = $request->user();
+        $backupDir = storage_path('app/avatars_backups/'.$user->id);
+        $backupPath = $backupDir.DIRECTORY_SEPARATOR.$data['filename'];
+
+        if (! is_file($backupPath)) {
+            return response()->json(['message' => 'Backup not found'], 404);
+        }
+
+        $publicDir = public_path('uploads/avatars/'.$user->id);
+        if (! is_dir($publicDir)) {
+            mkdir($publicDir, 0755, true);
+        }
+
+        $newFilename = uniqid('avatar_restored_', true).'.'.pathinfo($backupPath, PATHINFO_EXTENSION);
+        $newPublicPath = $publicDir.DIRECTORY_SEPARATOR.$newFilename;
+
+        if (! @copy($backupPath, $newPublicPath)) {
+            return response()->json(['message' => 'Unable to restore backup'], 500);
+        }
+
+        $newRelativePath = '/uploads/avatars/'.$user->id.'/'.$newFilename;
+
+        // Backup current avatar before switching (best-effort)
+        if ($user->avatar_url && str_starts_with($user->avatar_url, '/uploads/avatars/')) {
+            $currentFile = public_path(ltrim($user->avatar_url, '/'));
+            if (is_file($currentFile)) {
+                try {
+                    $backupDir = storage_path('app/avatars_backups/'.$user->id);
+                    if (! is_dir($backupDir)) mkdir($backupDir, 0755, true);
+                    @copy($currentFile, $backupDir.DIRECTORY_SEPARATOR.date('Ymd_His').'__'.basename($currentFile));
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
+        }
+
+        $user->forceFill(['avatar_url' => $newRelativePath])->save();
+
+        return response()->json(['avatarUrl' => $user->avatar_url, 'user' => ApiTransformer::user($user)]);
     }
 
     /**

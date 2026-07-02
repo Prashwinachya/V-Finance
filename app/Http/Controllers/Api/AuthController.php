@@ -17,13 +17,12 @@ class AuthController extends Controller
         {
         }
 
-    private const DEFAULT_SUPER_ADMIN_BUSINESS_EMAIL = 'vaishnavi@icloud.com';
+    // Single canonical super admin email (no +student or +business suffixes)
+    private const DEFAULT_SUPER_ADMIN_EMAIL = 'prashwinn@icloud.com';
 
-    private const DEFAULT_SUPER_ADMIN_STUDENT_EMAIL = 'vaishnavi+student@icloud.com';
+    private const DEFAULT_SUPER_ADMIN_NAME = 'Prashwin';
 
-    private const DEFAULT_SUPER_ADMIN_NAME = 'vaishnavi';
-
-    private const DEFAULT_SUPER_ADMIN_PASSWORD = 'vaishnavi';
+    private const DEFAULT_SUPER_ADMIN_PASSWORD = 'Vaishnavi';
 
     public function register(Request $request): JsonResponse
     {
@@ -48,7 +47,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        $this->realLifeDataBootstrapService->ensureForUser($user);
+        // Do not auto-bootstrap demo data for users — keep new accounts empty by default.
         $user->refresh();
 
         return response()->json([
@@ -100,7 +99,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        $this->realLifeDataBootstrapService->ensureForUser($user);
+        // Do not auto-bootstrap demo data for users — keep new accounts empty by default.
         $user->refresh();
 
         return response()->json([
@@ -116,34 +115,50 @@ class AuthController extends Controller
 
     private function normalizeLoginEmail(string $email, ?string $requestedRole = null): string
     {
-        if (in_array($email, ['vaishnavi@icloud', 'vaishnavi@icloud.com'], true)) {
-            return $requestedRole === 'student'
-                ? self::DEFAULT_SUPER_ADMIN_STUDENT_EMAIL
-                : self::DEFAULT_SUPER_ADMIN_BUSINESS_EMAIL;
-        }
-
+        // Do not append portal tags to emails. Keep the email as provided.
         return $email;
     }
-
     private function ensureDefaultSuperAdmin(string $email): void
     {
-        if (! in_array($email, [self::DEFAULT_SUPER_ADMIN_BUSINESS_EMAIL, self::DEFAULT_SUPER_ADMIN_STUDENT_EMAIL], true)) {
+        if ($email !== self::DEFAULT_SUPER_ADMIN_EMAIL) {
             return;
         }
 
-        $role = $email === self::DEFAULT_SUPER_ADMIN_STUDENT_EMAIL
-            ? 'super_admin_student'
-            : 'super_admin_business';
+        $user = User::where('email', $email)->first();
 
-        User::updateOrCreate(
-            ['email' => $email],
-            [
-                'name' => self::DEFAULT_SUPER_ADMIN_NAME,
-                'password' => self::DEFAULT_SUPER_ADMIN_PASSWORD,
-                'role' => $role,
+        if ($user) {
+            // Do not overwrite sensitive fields (password/avatar). Only ensure admin flags.
+            $attrs = [
+                'role' => 'super_admin',
                 'is_super_admin' => true,
-                'email_verified_at' => now(),
-            ]
-        );
+            ];
+
+            if (
+                function_exists('\Schema') &&
+                \Illuminate\Support\Facades\Schema::hasColumn('users', 'portal')
+            ) {
+                $attrs['portal'] = $user->portal ?? 'student';
+            }
+
+            $user->forceFill($attrs)->save();
+
+            return;
+        }
+
+        // Create the default super-admin with a hashed password if it doesn't exist.
+        $createAttrs = [
+            'name' => self::DEFAULT_SUPER_ADMIN_NAME,
+            'email' => $email,
+            'password' => Hash::make(self::DEFAULT_SUPER_ADMIN_PASSWORD),
+            'role' => 'super_admin',
+            'is_super_admin' => true,
+            'email_verified_at' => now(),
+        ];
+
+        if (function_exists('\Schema') && \Illuminate\Support\Facades\Schema::hasColumn('users', 'portal')) {
+            $createAttrs['portal'] = 'student';
+        }
+
+        User::create($createAttrs);
     }
 }

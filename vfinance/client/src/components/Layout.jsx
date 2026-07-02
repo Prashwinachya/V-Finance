@@ -1,7 +1,6 @@
 import { ChevronDown, LayoutDashboard, Receipt, Plane, Wallet, ShieldCheck, Landmark, Settings, Radar, Coins, CreditCard, Building2 } from 'lucide-react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserAvatar from './UserAvatar';
 
@@ -73,13 +72,14 @@ const menu = [
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
-  const interfaceRole = user?.portalRole || user?.role;
-  const roleBadgeLabel = interfaceRole === 'business_user' ? 'Business Badge' : 'Student Badge';
-  const roleBadgeClass = interfaceRole === 'business_user'
-    ? 'border-cyan-200 bg-cyan-50 text-cyan-700'
-    : 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  const [open, setOpen] = useState(false);
   const location = useLocation();
+  const interfaceRole = user?.portalRole || user?.role;
+  const showAdminBadge = location.pathname.startsWith('/admin') && ['admin', 'super_admin'].includes(user?.role);
+  const roleBadgeLabel = showAdminBadge ? (user?.role === 'super_admin' ? 'Super Admin' : 'Admin') : null;
+  const roleBadgeClass = user?.role === 'super_admin'
+    ? 'border-purple-100 bg-purple-50 text-purple-700'
+    : 'border-rose-100 bg-rose-50 text-rose-700';
+  const [open, setOpen] = useState(false);
   const navItems = menu.filter((item) => {
     const isAdminRoute = item.path === '/admin';
     if (isAdminRoute && !['admin', 'super_admin'].includes(user?.role)) {
@@ -148,10 +148,12 @@ const Layout = ({ children }) => {
 
           <div className="relative order-2 ml-auto shrink-0">
             <div className="flex items-center gap-2">
-              <span className={`hidden sm:inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${roleBadgeClass}`}>
-                <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                {roleBadgeLabel}
-              </span>
+              {roleBadgeLabel && (
+                <span className={`hidden sm:inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${roleBadgeClass}`}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                  {roleBadgeLabel}
+                </span>
+              )}
 
               <button
                 onClick={() => setOpen((prev) => !prev)}

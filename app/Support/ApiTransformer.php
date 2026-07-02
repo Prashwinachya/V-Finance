@@ -14,6 +14,13 @@ class ApiTransformer
 {
     private static function portalRole(User $user): string
     {
+        // If explicit portal column exists, prefer it
+        $portal = (string) ($user->portal ?? '');
+
+        if ($portal !== '') {
+            return in_array($portal, ['business_user'], true) ? 'business_user' : 'student';
+        }
+
         $rawRole = (string) ($user->role ?: 'user');
 
         return match ($rawRole) {
@@ -46,6 +53,7 @@ class ApiTransformer
             'name' => $user->name,
             'email' => $user->email,
             'role' => $effectiveRole,
+            'portal' => $user->portal ?? 'student',
             'portalRole' => self::portalRole($user),
             'isSuperAdmin' => (bool) $user->is_super_admin,
             'avatarUrl' => $user->avatar_url,

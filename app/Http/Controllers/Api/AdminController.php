@@ -59,7 +59,8 @@ class AdminController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
-            'role' => ['nullable', 'in:user,admin,super_admin'],
+            'role' => ['nullable', 'in:user,admin,student,business_user,super_admin'],
+            'portal' => ['nullable', 'in:student,business_user'],
         ]);
 
         $user = User::create([
@@ -68,6 +69,7 @@ class AdminController extends Controller
             'password' => $data['password'],
             'role' => $data['role'] ?? 'user',
             'is_super_admin' => ($data['role'] ?? 'user') === 'super_admin',
+            'portal' => $data['portal'] ?? 'student',
         ]);
 
         return response()->json(ApiTransformer::user($user), 201);
@@ -78,7 +80,8 @@ class AdminController extends Controller
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'email', 'max:255', 'unique:users,email,'.$user->id],
-            'role' => ['sometimes', 'in:user,admin,super_admin'],
+            'role' => ['sometimes', 'in:user,admin,student,business_user,super_admin'],
+            'portal' => ['sometimes', 'in:student,business_user'],
             'requirePaymentPin' => ['nullable', 'boolean'],
             'requirePaymentFingerprint' => ['nullable', 'boolean'],
         ]);
@@ -88,6 +91,7 @@ class AdminController extends Controller
             'email' => $data['email'] ?? $user->email,
             'role' => $data['role'] ?? $user->role,
             'is_super_admin' => ($data['role'] ?? $user->role) === 'super_admin',
+            'portal' => $data['portal'] ?? $user->portal,
             'require_payment_pin' => $data['requirePaymentPin'] ?? $user->require_payment_pin,
             'require_payment_fingerprint' => $data['requirePaymentFingerprint'] ?? $user->require_payment_fingerprint,
         ])->save();

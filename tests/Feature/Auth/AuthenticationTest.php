@@ -94,7 +94,7 @@ class AuthenticationTest extends TestCase
     public function test_super_admin_can_login_to_student_and_business_portals_with_same_credentials(): void
     {
         $businessLogin = $this->postJson('/api/auth/login', [
-            'email' => 'vaishnavi@icloud',
+            'email' => 'vaishnavi@icloud.com',
             'password' => 'vaishnavi',
             'role' => 'business_user',
         ]);
@@ -104,7 +104,7 @@ class AuthenticationTest extends TestCase
             ->assertJsonPath('user.portalRole', 'business_user');
 
         $studentLogin = $this->postJson('/api/auth/login', [
-            'email' => 'vaishnavi@icloud',
+            'email' => 'vaishnavi@icloud.com',
             'password' => 'vaishnavi',
             'role' => 'student',
         ]);
@@ -113,7 +113,7 @@ class AuthenticationTest extends TestCase
             ->assertJsonPath('user.role', 'super_admin')
             ->assertJsonPath('user.portalRole', 'student');
 
-        $this->assertNotSame(
+        $this->assertSame(
             $businessLogin->json('user.email'),
             $studentLogin->json('user.email')
         );

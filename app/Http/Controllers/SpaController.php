@@ -25,6 +25,7 @@ class SpaController extends Controller
             'useDevServer' => $useDevServer,
             'devServerUrl' => $devServerUrl,
             'entry' => $entry,
+            'baseUrl' => $useDevServer ? '/' : '/',
         ]);
     }
 

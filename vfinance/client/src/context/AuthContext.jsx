@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import api from '../api/client';
 
+console.log('=== AuthContext.jsx is loaded ===');
+
 const AuthContext = createContext(null);
 const USER_CACHE_KEY = 'vfinance_user_cache';
 
@@ -50,15 +52,21 @@ const extractUserPayload = (responseData) => {
 };
 
 export const AuthProvider = ({ children }) => {
+  console.log('=== AuthProvider initializing ===');
+  
   const [user, setUser] = useState(() => loadCachedUser());
   const [loading, setLoading] = useState(true);
+  
+  console.log('=== Initial user state:', user);
 
   const refreshMe = async () => {
+    console.log('=== refreshMe() called ===');
     const response = await api.get('/auth/me');
     const payload = extractUserPayload(response.data);
     if (!payload) {
       throw new Error('Unable to parse authenticated user payload');
     }
+    console.log('=== refreshMe() payload:', payload);
     setUser(payload);
 
     const remember = Boolean(localStorage.getItem('vfinance_token'));
@@ -66,8 +74,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    console.log('=== AuthProvider useEffect initial bootstrap ===');
     const bootstrap = async () => {
       const token = getStoredToken();
+      console.log('=== bootstrap - stored token:', token ? 'exists' : 'no token');
+      
       if (!token) {
         setUser(null);
         clearCachedUser();
@@ -78,6 +89,7 @@ export const AuthProvider = ({ children }) => {
       try {
         await refreshMe();
       } catch (requestError) {
+        console.error('=== bootstrap refreshMe error:', requestError);
         const status = requestError?.response?.status;
 
         // Only force logout when token is actually invalid/expired.
@@ -96,11 +108,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password, remember = true, role = null) => {
+    console.log('=== login() called with email:', email, 'role:', role);
     const response = await api.post('/auth/login', {
       email,
       password,
       ...(role ? { role } : {}),
     });
+    console.log('=== login response:', response);
     const payload = extractUserPayload(response.data);
 
     if (remember) {
@@ -117,6 +131,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (name, email, password, role = 'student', remember = true) => {
+    console.log('=== register() called ===');
     const response = await api.post('/auth/register', { name, email, password, role });
     const payload = extractUserPayload(response.data);
 
@@ -134,6 +149,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    console.log('=== logout() called ===');
     localStorage.removeItem('vfinance_token');
     sessionStorage.removeItem('vfinance_token');
     clearCachedUser();
@@ -144,6 +160,8 @@ export const AuthProvider = ({ children }) => {
     () => ({ user, loading, isAuthenticated: Boolean(user), login, register, logout, refreshMe }),
     [user, loading]
   );
+
+  console.log('=== AuthProvider value:', value);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

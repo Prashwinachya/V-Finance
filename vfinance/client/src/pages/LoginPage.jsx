@@ -160,6 +160,7 @@ const LoginPage = () => {
                   );
                 })}
               </div>
+              {/* Admin portal option removed — admin login handled separately via admin route */}
             </div>
 
             <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">

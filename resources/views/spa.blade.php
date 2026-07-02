@@ -4,8 +4,11 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>VFinance</title>
+        <script>
+            window.__BASE_URL__ = "/";
+        </script>
         @if ($useDevServer)
-            <script type="module" src="{{ $devServerUrl }}/@vite/client"></script>
+            <script type="module" src="{{ $devServerUrl }}/@@vite/client"></script>
             <script type="module" src="{{ $devServerUrl }}/src/main.jsx"></script>
         @elseif ($entry)
             @foreach (($entry['css'] ?? []) as $cssFile)

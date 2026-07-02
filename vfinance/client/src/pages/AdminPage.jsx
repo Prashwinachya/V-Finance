@@ -33,10 +33,12 @@ const AdminPage = () => {
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState([]);
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'user' });
+  const [newUserPortal, setNewUserPortal] = useState('student');
   const [view, setView] = useState('dashboard');
   const [busy, setBusy] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
   const [editUser, setEditUser] = useState({ name: '', email: '', role: 'user' });
+  const [editUserPortal, setEditUserPortal] = useState('student');
 
   const loadData = async () => {
     try {
@@ -66,9 +68,10 @@ const AdminPage = () => {
     if (busy) return;
     setBusy(true);
     try {
-      const payload = isSuperAdmin ? newUser : { ...newUser, role: 'user' };
+      const payload = isSuperAdmin ? { ...newUser, portal: newUserPortal } : { ...newUser, role: 'user', portal: newUserPortal };
       await api.post('/admin/users', payload);
       setNewUser({ name: '', email: '', password: '', role: 'user' });
+      setNewUserPortal('student');
       await loadData();
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to create user right now.');
@@ -80,6 +83,7 @@ const AdminPage = () => {
   const openEditUser = (user) => {
     setEditingUserId(user._id);
     setEditUser({ name: user.name || '', email: user.email || '', role: user.role || 'user' });
+    setEditUserPortal(user.portalRole || 'student');
   };
 
   const saveUser = async (event) => {
@@ -87,7 +91,7 @@ const AdminPage = () => {
     if (!editingUserId || busy) return;
     setBusy(true);
     try {
-      await api.patch(`/admin/users/${editingUserId}`, editUser);
+      await api.patch(`/admin/users/${editingUserId}`, { ...editUser, portal: editUserPortal });
       setEditingUserId(null);
       await loadData();
     } catch (requestError) {
@@ -342,17 +346,17 @@ const AdminPage = () => {
                         <p className="truncate text-xs text-slate-500">{user.email}</p>
                       </div>
                     </div>
-                    <span
-                      className={
-                        user.role === 'super_admin'
-                          ? 'rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700'
-                          : user.role === 'admin'
-                          ? 'rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700'
-                          : 'rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-700'
-                      }
-                    >
-                      {roleLabel(user.role)}
-                    </span>
+                    {['admin', 'super_admin'].includes(user.role) && (
+                      <span
+                        className={
+                          user.role === 'super_admin'
+                            ? 'rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700'
+                            : 'rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700'
+                        }
+                      >
+                        {user.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -424,15 +428,21 @@ const AdminPage = () => {
             </div>
 
             <form className="mt-4 grid gap-3 md:grid-cols-4" onSubmit={createUser}>
-              <input className="input-soft" placeholder="Name" value={newUser.name} onChange={(event) => setNewUser((prev) => ({ ...prev, name: event.target.value }))} required />
-              <input className="input-soft" placeholder="Email" type="email" value={newUser.email} onChange={(event) => setNewUser((prev) => ({ ...prev, email: event.target.value }))} required />
-              <input className="input-soft" placeholder="Password" type="password" value={newUser.password} onChange={(event) => setNewUser((prev) => ({ ...prev, password: event.target.value }))} required />
-              <div className="flex gap-2">
-                <select className="input-soft" value={newUser.role} onChange={(event) => setNewUser((prev) => ({ ...prev, role: event.target.value }))}>
+              <input className="input-soft min-w-0" placeholder="Name" value={newUser.name} onChange={(event) => setNewUser((prev) => ({ ...prev, name: event.target.value }))} required />
+              <input className="input-soft min-w-0" placeholder="Email" type="email" value={newUser.email} onChange={(event) => setNewUser((prev) => ({ ...prev, email: event.target.value }))} required />
+              <input className="input-soft min-w-0" placeholder="Password" type="password" value={newUser.password} onChange={(event) => setNewUser((prev) => ({ ...prev, password: event.target.value }))} required />
+              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+                <select className="input-soft min-w-0" value={newUser.role} onChange={(event) => setNewUser((prev) => ({ ...prev, role: event.target.value }))}>
                   <option value="user">User</option>
                   {isSuperAdmin && <option value="admin">Admin</option>}
+                  {isSuperAdmin && <option value="student">Student</option>}
+                  {isSuperAdmin && <option value="business_user">Business User</option>}
                 </select>
-                <button className="btn-gradient" type="submit" disabled={busy}>
+                <select className="input-soft min-w-0" value={newUserPortal} onChange={(e) => setNewUserPortal(e.target.value)}>
+                  <option value="student">Student Portal</option>
+                  <option value="business_user">Business Portal</option>
+                </select>
+                <button className="btn-gradient shrink-0" type="submit" disabled={busy}>
                   Create
                 </button>
               </div>
@@ -460,18 +470,26 @@ const AdminPage = () => {
               </div>
 
               <div className="mt-4 grid gap-3 md:grid-cols-4">
-                <input className="input-soft" placeholder="Name" value={editUser.name} onChange={(event) => setEditUser((prev) => ({ ...prev, name: event.target.value }))} />
-                <input className="input-soft" placeholder="Email" type="email" value={editUser.email} onChange={(event) => setEditUser((prev) => ({ ...prev, email: event.target.value }))} />
-                <select
-                  className="input-soft"
-                  value={editUser.role}
-                  onChange={(event) => setEditUser((prev) => ({ ...prev, role: event.target.value }))}
-                  disabled={!isSuperAdmin || editUser.role === 'super_admin'}
-                >
-                  <option value="user">User</option>
-                  {isSuperAdmin && <option value="admin">Admin</option>}
-                </select>
-                <button className="btn-gradient" type="submit" disabled={busy}>
+                <input className="input-soft min-w-0" placeholder="Name" value={editUser.name} onChange={(event) => setEditUser((prev) => ({ ...prev, name: event.target.value }))} />
+                <input className="input-soft min-w-0" placeholder="Email" type="email" value={editUser.email} onChange={(event) => setEditUser((prev) => ({ ...prev, email: event.target.value }))} />
+                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+                  <select
+                    className="input-soft min-w-0"
+                    value={editUser.role}
+                    onChange={(event) => setEditUser((prev) => ({ ...prev, role: event.target.value }))}
+                    disabled={!isSuperAdmin || editUser.role === 'super_admin'}
+                  >
+                    <option value="user">User</option>
+                    {isSuperAdmin && <option value="admin">Admin</option>}
+                    {isSuperAdmin && <option value="student">Student</option>}
+                    {isSuperAdmin && <option value="business_user">Business User</option>}
+                  </select>
+                  <select className="input-soft min-w-0" value={editUserPortal} onChange={(e) => setEditUserPortal(e.target.value)}>
+                    <option value="student">Student Portal</option>
+                    <option value="business_user">Business Portal</option>
+                  </select>
+                </div>
+                <button className="btn-gradient shrink-0" type="submit" disabled={busy}>
                   Save
                 </button>
               </div>
@@ -515,7 +533,7 @@ const AdminPage = () => {
                               : 'inline-flex items-center gap-1 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700'
                         }
                       >
-                        {roleLabel(user.role)}
+                        {['admin', 'super_admin'].includes(user.role) ? (user.role === 'super_admin' ? 'Super Admin' : 'Admin') : ''}
                       </span>
                     </td>
                     <td className="text-slate-700">{user.transactionsCount ?? 0}</td>

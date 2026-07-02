@@ -15,12 +15,15 @@ import LoanOptimizerPage from './pages/LoanOptimizerPage';
 import PaymentsPage from './pages/PaymentsPage';
 import BankSyncPage from './pages/BankSyncPage';
 
+console.log('=== App.jsx is loaded ===');
+
 const AppRoutes = () => {
-  const { isAuthenticated } = useAuth();
+  const auth = useAuth();
+  console.log('=== AppRoutes auth state:', auth);
 
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/login" element={auth.isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
 
       <Route
         path="/"
@@ -143,15 +146,22 @@ const AppRoutes = () => {
         }
       />
 
-      <Route path="*" element={<Navigate to={isAuthenticated ? '/' : '/login'} replace />} />
+      <Route path="*" element={<Navigate to={auth.isAuthenticated ? "/" : "/login"} replace />} />
     </Routes>
   );
 };
 
 const App = () => {
+  console.log('=== App component rendering ===');
+  const base = typeof window !== 'undefined' && window.__BASE_URL__ 
+    ? window.__BASE_URL__ 
+    : (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL ? import.meta.env.BASE_URL : '/');
+  
+  console.log('=== BrowserRouter basename:', base);
+
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={base}>
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>

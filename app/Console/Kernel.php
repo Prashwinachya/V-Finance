@@ -28,6 +28,9 @@ class Kernel extends ConsoleKernel
     {
         $this->load(__DIR__.'/Commands');
 
+        // register custom data migration commands
+        $this->load(__DIR__.'/Commands/CopySqliteToPostgres.php');
+
         require base_path('routes/console.php');
     }
 }

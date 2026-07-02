@@ -38,7 +38,16 @@ return [
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DATABASE_URL'),
-            'database' => env('DB_DATABASE', database_path('database.sqlite')),
+            'database' => env('SQLITE_DATABASE', database_path('database.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+        ],
+
+        // local sqlite connection explicitly for migrations/imports
+        'sqlite_local' => [
+            'driver' => 'sqlite',
+            'url' => env('SQLITE_DATABASE_URL'),
+            'database' => env('SQLITE_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
         ],
