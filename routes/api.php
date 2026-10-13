@@ -12,6 +12,11 @@ use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\TripController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WalletController;
+use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\AuditLogController;
+use App\Http\Controllers\Api\FinancialAutopilotController;
+use App\Http\Controllers\Api\EmergencyModeController;
+use App\Http\Controllers\Api\FinancialPulseController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -74,6 +79,18 @@ Route::middleware('auth:sanctum')->group(function (): void {
 	Route::put('/user/pin', [UserController::class, 'updatePin']);
 	Route::delete('/user/pin', [UserController::class, 'resetPin']);
 	Route::put('/user/security', [UserController::class, 'updateSecurity']);
+
+	// Settings & FCC
+	Route::get('/settings', [SettingsController::class, 'getSettings']);
+	Route::put('/settings', [SettingsController::class, 'updateSettings']);
+	Route::get('/settings/sessions', [SettingsController::class, 'getActiveSessions']);
+	Route::delete('/settings/sessions/{id}', [SettingsController::class, 'revokeSession']);
+	Route::post('/settings/lock-account', [SettingsController::class, 'lockAccount']);
+
+	Route::get('/audit-logs', [AuditLogController::class, 'index']);
+	Route::get('/financial-autopilot', [FinancialAutopilotController::class, 'index']);
+	Route::get('/emergency-mode', [EmergencyModeController::class, 'getEmergencyData']);
+	Route::get('/financial-pulse', [FinancialPulseController::class, 'getPulse']);
 
 	Route::get('/banks', [BankConnectionController::class, 'index']);
 	Route::post('/banks/connect', [BankConnectionController::class, 'store']);
