@@ -6,7 +6,7 @@
         "dev:backend": "php artisan serve --host=localhost --port=8000",
         "dev:frontend": "npm --prefix vfinance/client run dev",
         "dev:full": "npm run dev:backend",
-        "build": "npm --prefix vfinance/client run build"
+        "build": "npm --prefix vfinance/client run build && (cp -r vfinance/client/dist ./dist 2>/dev/null || true)"
     },
     "devDependencies": {
         "concurrently": "^9.2.1"

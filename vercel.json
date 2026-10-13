@@ -1,0 +1,7 @@
+{
+  "buildCommand": "npm --prefix vfinance/client run build",
+  "outputDirectory": "vfinance/client/dist",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/" }
+  ]
+}
