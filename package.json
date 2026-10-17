@@ -2,10 +2,10 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "npm run dev:backend",
-        "dev:backend": "php artisan serve --host=localhost --port=8000",
+        "dev": "npm --prefix vfinance/client run dev",
+        "dev:client": "npm --prefix vfinance/client run dev",
         "dev:frontend": "npm --prefix vfinance/client run dev",
-        "dev:full": "npm run dev:backend",
+        "dev:backend": "php artisan serve --host=127.0.0.1 --port=8000",
         "build": "npm --prefix vfinance/client run build && (cp -r vfinance/client/dist ./dist 2>/dev/null || true)"
     },
     "devDependencies": {
