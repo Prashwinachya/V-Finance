@@ -30,12 +30,18 @@ function syncToLaravelPublic() {
 export default defineConfig(() => ({
   base: '/',
   server: {
-    host: '127.0.0.1',
-    port: 5175,
+    host: 'localhost',
+    port: 5174,
     strictPort: true,
     proxy: {
-      '/api': 'http://127.0.0.1:8000',
-      '/uploads': 'http://127.0.0.1:8000',
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
     },
   },
   build: {

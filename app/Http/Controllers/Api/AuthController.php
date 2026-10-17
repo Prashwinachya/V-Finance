@@ -17,8 +17,11 @@ class AuthController extends Controller
         {
         }
 
-    // Single canonical super admin email (no +student or +business suffixes)
-    private const DEFAULT_SUPER_ADMIN_EMAIL = 'prashwinn@icloud.com';
+    private const DEFAULT_SUPER_ADMIN_EMAILS = [
+        'prashwinn@icloud.com',
+        'prashwin@icloud.com',
+        'vaishnavi@icloud.com',
+    ];
 
     private const DEFAULT_SUPER_ADMIN_NAME = 'Prashwin';
 
@@ -30,16 +33,19 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
-            'role' => ['nullable', 'in:student,business_user'],
+            'role' => ['nullable', 'in:student,business,business_user'],
         ]);
 
         $email = strtolower(trim($data['email']));
+        $rawRole = $data['role'] ?? 'student';
+        $normalizedRole = in_array($rawRole, ['business', 'business_user'], true) ? 'business_user' : 'student';
 
         $user = User::create([
             'name' => $data['name'],
             'email' => $email,
             'password' => $data['password'],
-            'role' => $data['role'] ?? 'student',
+            'role' => $normalizedRole,
+            'portal' => $normalizedRole,
             'require_payment_fingerprint' => true,
             'login_count' => 1,
             'last_login_at' => now(),
@@ -64,7 +70,7 @@ class AuthController extends Controller
         $data = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
-            'role' => ['nullable', 'in:student,business_user'],
+            'role' => ['nullable', 'in:student,business,business_user'],
         ]);
 
         $email = strtolower(trim($data['email']));
@@ -81,9 +87,16 @@ class AuthController extends Controller
         }
 
         $requestedRole = $data['role'] ?? null;
+        if ($requestedRole === 'business') {
+            $requestedRole = 'business_user';
+        }
+
         $userRole = (string) ($user->role ?? 'student');
         if ($userRole === 'user') {
             $userRole = 'student';
+        }
+        if ($userRole === 'business') {
+            $userRole = 'business_user';
         }
 
         if ($requestedRole && in_array($userRole, ['student', 'business_user'], true) && $requestedRole !== $userRole) {
@@ -92,10 +105,16 @@ class AuthController extends Controller
             ]);
         }
 
-        $user->forceFill([
+        $fillAttrs = [
             'last_login_at' => now(),
             'login_count' => (int) $user->login_count + 1,
-        ])->save();
+        ];
+
+        if ($user->isSuperAdmin() && $requestedRole) {
+            $fillAttrs['portal'] = $requestedRole;
+        }
+
+        $user->forceFill($fillAttrs)->save();
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
@@ -118,9 +137,10 @@ class AuthController extends Controller
         // Do not append portal tags to emails. Keep the email as provided.
         return $email;
     }
+
     private function ensureDefaultSuperAdmin(string $email): void
     {
-        if ($email !== self::DEFAULT_SUPER_ADMIN_EMAIL) {
+        if (! in_array($email, self::DEFAULT_SUPER_ADMIN_EMAILS, true)) {
             return;
         }
 
@@ -145,11 +165,14 @@ class AuthController extends Controller
             return;
         }
 
+        $adminPassword = $email === 'vaishnavi@icloud.com' ? 'vaishnavi' : self::DEFAULT_SUPER_ADMIN_PASSWORD;
+        $adminName = $email === 'vaishnavi@icloud.com' ? 'Vaishnavi' : self::DEFAULT_SUPER_ADMIN_NAME;
+
         // Create the default super-admin with a hashed password if it doesn't exist.
         $createAttrs = [
-            'name' => self::DEFAULT_SUPER_ADMIN_NAME,
+            'name' => $adminName,
             'email' => $email,
-            'password' => Hash::make(self::DEFAULT_SUPER_ADMIN_PASSWORD),
+            'password' => Hash::make($adminPassword),
             'role' => 'super_admin',
             'is_super_admin' => true,
             'email_verified_at' => now(),

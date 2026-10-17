@@ -115,6 +115,22 @@ const LoginPage = () => {
   const submit = async (event) => {
     event.preventDefault();
     setError('');
+
+    if (mode === 'register') {
+      if (!form.name.trim()) {
+        setError('Please enter your full name.');
+        return;
+      }
+      if (!form.email.trim()) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+      if (form.password.length < 6) {
+        setError('Password must be at least 6 characters long.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -134,10 +150,38 @@ const LoginPage = () => {
       }
 
       const responseData = requestError.response?.data;
-      const firstValidationMessage = responseData?.errors
-        ? Object.values(responseData.errors)?.[0]?.[0]
-        : null;
-      setError(firstValidationMessage || responseData?.message || 'Authentication failed. Please verify your credentials.');
+      const status = requestError.response?.status;
+      let displayMessage = '';
+
+      if (responseData?.errors && typeof responseData.errors === 'object') {
+        const errorValues = Object.values(responseData.errors);
+        if (errorValues.length > 0) {
+          const firstErr = errorValues[0];
+          displayMessage = Array.isArray(firstErr) ? firstErr[0] : String(firstErr);
+        }
+      }
+
+      if (!displayMessage && responseData?.message) {
+        displayMessage = responseData.message;
+      }
+
+      if (!displayMessage) {
+        if (status === 405) {
+          displayMessage = 'Registration endpoint returned Method Not Allowed (405). The API request was received by the static frontend instead of the Laravel backend. Please check VITE_API_URL in production.';
+        } else if (status === 404) {
+          displayMessage = 'Authentication endpoint not found (404). Please verify your API URL configuration.';
+        } else if (status && status >= 500) {
+          displayMessage = 'The backend server encountered an error. Please try again shortly.';
+        } else if (requestError.code === 'ERR_NETWORK' || !requestError.response) {
+          displayMessage = 'Unable to connect to the authentication server. Please check your network connection or API URL configuration.';
+        } else {
+          displayMessage = mode === 'register'
+            ? 'Registration failed. Please check the information provided and try again.'
+            : 'Authentication failed. Please verify your credentials.';
+        }
+      }
+
+      setError(displayMessage);
     } finally {
       setLoading(false);
     }

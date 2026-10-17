@@ -136,7 +136,7 @@ php artisan migrate
 ```bash
 npm --prefix vfinance/client run dev
 ```
-*Frontend runs at `http://localhost:5175`*
+*Frontend runs at `http://localhost:5174`*
 
 **Option B: Full-Stack with Laravel API Backend**
 ```bash

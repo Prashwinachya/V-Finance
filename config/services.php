@@ -33,7 +33,7 @@ return [
 
     'vfinance' => [
         'node_api_url' => env('VFINANCE_NODE_API_URL', 'http://127.0.0.1:5050'),
-        'dev_server_url' => env('VFINANCE_DEV_SERVER_URL', 'http://127.0.0.1:5175'),
+        'dev_server_url' => env('VFINANCE_DEV_SERVER_URL', 'http://127.0.0.1:5174'),
         'use_dev_server' => env('VFINANCE_USE_DEV_SERVER', true),
     ],
 

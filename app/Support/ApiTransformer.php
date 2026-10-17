@@ -18,14 +18,14 @@ class ApiTransformer
         $portal = (string) ($user->portal ?? '');
 
         if ($portal !== '') {
-            return in_array($portal, ['business_user'], true) ? 'business_user' : 'student';
+            return in_array($portal, ['business_user', 'business'], true) ? 'business_user' : 'student';
         }
 
         $rawRole = (string) ($user->role ?: 'user');
 
         return match ($rawRole) {
             'user', 'student', 'super_admin_student' => 'student',
-            'business_user', 'super_admin_business', 'super_admin' => 'business_user',
+            'business', 'business_user', 'super_admin_business', 'super_admin' => 'business_user',
             default => 'student',
         };
     }
@@ -53,7 +53,7 @@ class ApiTransformer
             'name' => $user->name,
             'email' => $user->email,
             'role' => $effectiveRole,
-            'portal' => $user->portal ?? 'student',
+            'portal' => $user->portal ?? self::portalRole($user),
             'portalRole' => self::portalRole($user),
             'isSuperAdmin' => (bool) $user->is_super_admin,
             'avatarUrl' => $user->avatar_url,
