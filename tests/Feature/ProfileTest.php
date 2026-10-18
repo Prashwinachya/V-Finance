@@ -65,6 +65,67 @@ class ProfileTest extends TestCase
         $this->assertNotNull($user->fresh()->avatar_url);
     }
 
+    public function test_avatar_upload_fails_for_disallowed_mime_types(): void
+    {
+        $user = User::factory()->create([
+            'password' => bcrypt('password123'),
+        ]);
+
+        $token = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+        ])->json('token');
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/user/avatar', [
+                'avatar' => UploadedFile::fake()->create('document.pdf', 100, 'application/pdf'),
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['avatar']);
+    }
+
+    public function test_avatar_upload_fails_for_files_exceeding_two_megabytes(): void
+    {
+        $user = User::factory()->create([
+            'password' => bcrypt('password123'),
+        ]);
+
+        $token = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+        ])->json('token');
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/user/avatar', [
+                'avatar' => UploadedFile::fake()->image('large.png')->size(2500),
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['avatar']);
+    }
+
+    public function test_avatar_can_be_deleted_for_authenticated_user(): void
+    {
+        $user = User::factory()->create([
+            'password' => bcrypt('password123'),
+            'avatar_url' => '/uploads/avatars/test/avatar.jpg',
+        ]);
+
+        $token = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+        ])->json('token');
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->deleteJson('/api/user/avatar');
+
+        $response->assertOk()
+            ->assertJson(['avatarUrl' => null]);
+
+        $this->assertNull($user->fresh()->avatar_url);
+    }
+
     public function test_user_security_preferences_can_be_updated(): void
     {
         $user = User::factory()->create([

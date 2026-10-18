@@ -45,7 +45,12 @@ class UserController extends Controller
     public function uploadAvatar(Request $request): JsonResponse
     {
         $request->validate([
-            'avatar' => ['required', 'file', 'max:2048', 'mimes:jpg,jpeg,png,webp,gif,svg,heic,heif,avif'],
+            'avatar' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ], [
+            'avatar.required' => 'Please select an image to upload.',
+            'avatar.file' => 'The uploaded file is not valid.',
+            'avatar.mimes' => 'Only JPG, PNG, and WEBP image formats are supported.',
+            'avatar.max' => 'The image size cannot exceed 2 MB.',
         ]);
 
         $user = $request->user();
@@ -92,6 +97,29 @@ class UserController extends Controller
         return response()->json([
             'avatarUrl' => $user->avatar_url,
             'user' => ApiTransformer::user($user),
+            'message' => 'Profile picture updated successfully.',
+        ]);
+    }
+
+    public function deleteAvatar(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->avatar_url && str_starts_with($user->avatar_url, '/uploads/avatars/')) {
+            $filePath = public_path(ltrim($user->avatar_url, '/'));
+            if (is_file($filePath)) {
+                @unlink($filePath);
+            }
+        }
+
+        $user->forceFill([
+            'avatar_url' => null,
+        ])->save();
+
+        return response()->json([
+            'avatarUrl' => null,
+            'user' => ApiTransformer::user($user),
+            'message' => 'Profile picture removed successfully.',
         ]);
     }
 

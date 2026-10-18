@@ -72,6 +72,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
 	Route::put('/user/profile', [UserController::class, 'updateProfile']);
 	Route::post('/user/avatar', [UserController::class, 'uploadAvatar']);
+	Route::delete('/user/avatar', [UserController::class, 'deleteAvatar']);
 	Route::get('/user/avatar/backups', [UserController::class, 'listAvatarBackups']);
 	Route::post('/user/avatar/restore', [UserController::class, 'restoreAvatarBackup']);
 	Route::put('/user/password', [UserController::class, 'updatePassword']);
