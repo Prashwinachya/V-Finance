@@ -11,7 +11,23 @@ class Wallet extends Model
 {
     use HasFactory;
 
-    public const MAX_WALLETS = 8;
+    public const MAX_BUSINESS_WALLETS = 3;
+    public const MAX_STUDENT_WALLETS = 1;
+    public const MAX_WALLETS = 3;
+
+    public const TYPE_TRAVELLING = 'travelling_wallet';
+    public const TYPE_MEDICAL_EMERGENCY = 'medical_emergency_wallet';
+    public const TYPE_POCKET_SAVER = 'pocket_saver_wallet';
+
+    public const ALLOWED_BUSINESS_TYPES = [
+        self::TYPE_TRAVELLING,
+        self::TYPE_MEDICAL_EMERGENCY,
+        self::TYPE_POCKET_SAVER,
+    ];
+
+    public const ALLOWED_STUDENT_TYPES = [
+        self::TYPE_POCKET_SAVER,
+    ];
 
     protected $fillable = [
         'user_id',

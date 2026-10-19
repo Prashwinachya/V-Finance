@@ -141,11 +141,16 @@ class BankAccountProvisioningService
         if ($this->isStudent($connection)) {
             $existing = Wallet::query()
                 ->where('user_id', $connection->user_id)
-                ->where('wallet_type', 'pocket_saver_wallet')
+                ->where('wallet_type', Wallet::TYPE_POCKET_SAVER)
                 ->oldest('id')
                 ->first();
 
             if ($existing) {
+                if (! $existing->bank_connection_id) {
+                    $existing->bank_connection_id = $connection->id;
+                    $existing->save();
+                }
+
                 return $existing;
             }
 
@@ -153,26 +158,41 @@ class BankAccountProvisioningService
                 'user_id' => $connection->user_id,
                 'bank_connection_id' => $connection->id,
                 'name' => 'Pocket Saver Wallet',
-                'wallet_type' => 'pocket_saver_wallet',
+                'wallet_type' => Wallet::TYPE_POCKET_SAVER,
                 'balance' => $profile['walletBalance'],
                 'last_withdrawal_date' => now()->subDays(16 + ($profile['seed'] % 5)),
             ]);
         }
 
-        return Wallet::query()->firstOrCreate(
-            [
-                'user_id' => $connection->user_id,
-                'bank_connection_id' => $connection->id,
-                'name' => $profile['walletName'],
-            ],
-            [
-                'wallet_type' => $profile['walletType'],
-                'balance' => $profile['walletBalance'],
-                'last_withdrawal_date' => $profile['walletType'] === 'pocket_saver_wallet'
-                    ? now()->subDays(16 + ($profile['seed'] % 5))
-                    : null,
-            ]
-        );
+        $existing = Wallet::query()
+            ->where('user_id', $connection->user_id)
+            ->where('wallet_type', $profile['walletType'])
+            ->first();
+
+        if ($existing) {
+            if (! $existing->bank_connection_id) {
+                $existing->bank_connection_id = $connection->id;
+                $existing->save();
+            }
+
+            return $existing;
+        }
+
+        $count = Wallet::query()->where('user_id', $connection->user_id)->count();
+        if ($count >= Wallet::MAX_BUSINESS_WALLETS) {
+            return Wallet::query()->where('user_id', $connection->user_id)->oldest('id')->first();
+        }
+
+        return Wallet::query()->create([
+            'user_id' => $connection->user_id,
+            'bank_connection_id' => $connection->id,
+            'name' => $profile['walletName'],
+            'wallet_type' => $profile['walletType'],
+            'balance' => $profile['walletBalance'],
+            'last_withdrawal_date' => $profile['walletType'] === Wallet::TYPE_POCKET_SAVER
+                ? now()->subDays(16 + ($profile['seed'] % 5))
+                : null,
+        ]);
     }
 
     private function ensureWalletSeedTransactions(BankConnection $connection, Wallet $wallet, array $profile): void
@@ -363,7 +383,10 @@ class BankAccountProvisioningService
 
     private function isStudent(BankConnection $connection): bool
     {
-        $role = (string) ($connection->user?->role ?? 'student');
-        return in_array($role, ['student', 'user', 'super_admin_student'], true);
+        if ($connection->user?->isAdmin()) {
+            return false;
+        }
+
+        return $connection->user?->isStudent() ?? true;
     }
 }

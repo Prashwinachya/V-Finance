@@ -120,7 +120,7 @@ const AccountMenu = ({ user, logout }) => {
           id="account-dropdown-menu"
           role="menu"
           aria-label="Account options"
-          className="absolute right-0 top-full mt-2 w-[calc(100vw-24px)] max-w-xs sm:w-80 sm:max-w-none rounded-2xl border border-slate-200/90 bg-white p-2.5 shadow-2xl shadow-slate-900/10 z-50 motion-safe:animate-in motion-safe:fade-in-50 motion-safe:zoom-in-95 max-h-[calc(100vh-85px)] overflow-y-auto"
+          className="absolute right-0 top-full mt-2 w-72 sm:w-80 max-w-[calc(100dvw-2rem)] rounded-2xl border border-slate-200/90 bg-white p-2.5 shadow-2xl shadow-slate-900/10 z-50 motion-safe:animate-in motion-safe:fade-in-50 motion-safe:zoom-in-95 max-h-[calc(100dvh-85px)] overflow-y-auto"
         >
           {/* User Profile Header */}
           <div className="flex items-start gap-3 rounded-xl bg-slate-50/70 p-3 border border-slate-100">

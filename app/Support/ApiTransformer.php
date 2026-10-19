@@ -14,20 +14,7 @@ class ApiTransformer
 {
     private static function portalRole(User $user): string
     {
-        // If explicit portal column exists, prefer it
-        $portal = (string) ($user->portal ?? '');
-
-        if ($portal !== '') {
-            return in_array($portal, ['business_user', 'business'], true) ? 'business_user' : 'student';
-        }
-
-        $rawRole = (string) ($user->role ?: 'user');
-
-        return match ($rawRole) {
-            'user', 'student', 'super_admin_student' => 'student',
-            'business', 'business_user', 'super_admin_business', 'super_admin' => 'business_user',
-            default => 'student',
-        };
+        return $user->portalRole();
     }
 
     public static function date(CarbonInterface|string|null $value): ?string

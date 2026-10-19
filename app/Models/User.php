@@ -105,12 +105,58 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return in_array($this->role, ['admin', 'super_admin'], true) || $this->is_super_admin;
+        return in_array($this->role, ['admin', 'super_admin'], true) || (bool) $this->is_super_admin;
     }
 
     public function isSuperAdmin(): bool
     {
-        return $this->role === 'super_admin' || $this->is_super_admin;
+        return $this->role === 'super_admin' || (bool) $this->is_super_admin;
+    }
+
+    public function portalRole(): string
+    {
+        if ($this->isAdmin()) {
+            $portal = (string) ($this->portal ?? '');
+            if (in_array($portal, ['student', 'business_user', 'business'], true)) {
+                return $portal === 'business' ? 'business_user' : $portal;
+            }
+            return 'business_user';
+        }
+
+        $role = (string) ($this->role ?: 'user');
+
+        if (in_array($role, ['business', 'business_user', 'super_admin_business'], true)) {
+            return 'business_user';
+        }
+
+        if (in_array($role, ['student', 'super_admin_student'], true)) {
+            return 'student';
+        }
+
+        $portal = (string) ($this->portal ?? '');
+        if (in_array($portal, ['business_user', 'business'], true)) {
+            return 'business_user';
+        }
+
+        return 'student';
+    }
+
+    public function isBusiness(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->portalRole() === 'business_user';
+    }
+
+    public function isStudent(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->portalRole() === 'student';
     }
 
     public function transactions(): HasMany

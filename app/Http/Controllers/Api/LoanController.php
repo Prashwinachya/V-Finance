@@ -117,6 +117,10 @@ class LoanController extends Controller
 
     private function abortIfNotBusiness(Request $request): void
     {
+        if ($request->user()?->isAdmin()) {
+            return;
+        }
+
         $role = (string) ($request->user()?->role ?? 'student');
         if (! in_array($role, ['business_user', 'super_admin_business', 'super_admin'], true)) {
             abort(response()->json([

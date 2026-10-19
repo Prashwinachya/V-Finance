@@ -110,7 +110,7 @@ class AuthController extends Controller
             'login_count' => (int) $user->login_count + 1,
         ];
 
-        if ($user->isSuperAdmin() && $requestedRole) {
+        if ($user->isAdmin() && $requestedRole) {
             $fillAttrs['portal'] = $requestedRole;
         }
 

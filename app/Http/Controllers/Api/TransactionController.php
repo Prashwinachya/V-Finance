@@ -237,6 +237,10 @@ class TransactionController extends Controller
 
     private function abortIfBusinessUser(Request $request): void
     {
+        if ($request->user()?->isAdmin()) {
+            return;
+        }
+
         if (($request->user()?->role ?? null) === 'business_user') {
             abort(response()->json([
                 'message' => 'Business accounts are read-only in Transactions. Sync your bank accounts to import transactions automatically.',

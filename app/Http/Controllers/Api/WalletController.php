@@ -17,12 +17,25 @@ class WalletController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        if ($user->isAdmin()) {
+            $wallets = Wallet::query()
+                ->where('user_id', $user->id)
+                ->whereIn('wallet_type', Wallet::ALLOWED_BUSINESS_TYPES)
+                ->oldest('id')
+                ->get()
+                ->map(fn (Wallet $wallet): array => ApiTransformer::wallet($wallet, $this->walletMetrics($wallet)));
+
+            return response()->json($wallets);
+        }
+
         if ($this->isStudent($request)) {
-            $this->migrateStudentLegacyWalletIfNeeded((string) $request->user()->id);
+            $this->migrateStudentLegacyWalletIfNeeded((string) $user->id);
 
             $wallets = Wallet::query()
-                ->where('user_id', $request->user()->id)
-                ->where('wallet_type', 'pocket_saver_wallet')
+                ->where('user_id', $user->id)
+                ->where('wallet_type', Wallet::TYPE_POCKET_SAVER)
                 ->oldest('id')
                 ->limit(1)
                 ->get()
@@ -31,11 +44,10 @@ class WalletController extends Controller
             return response()->json($wallets);
         }
 
-        $walletsQuery = Wallet::query()
-            ->where('user_id', $request->user()->id)
-            ->latest();
-
-        $wallets = $walletsQuery
+        $wallets = Wallet::query()
+            ->where('user_id', $user->id)
+            ->whereIn('wallet_type', Wallet::ALLOWED_BUSINESS_TYPES)
+            ->oldest('id')
             ->get()
             ->map(fn (Wallet $wallet): array => ApiTransformer::wallet($wallet, $this->walletMetrics($wallet)));
 
@@ -46,53 +58,125 @@ class WalletController extends Controller
     {
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:120'],
-            'walletType' => ['required', 'in:default_wallet,cash_wallet,personal_wallet,travelling_wallet,medical_emergency_wallet,pocket_saver_wallet'],
+            'walletType' => ['required', 'string'],
             'balance' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        if ($this->isStudent($request) && $data['walletType'] !== 'pocket_saver_wallet') {
-            return response()->json(['message' => 'Student accounts can only use Pocket Saver Wallet.'], 422);
-        }
+        $user = $request->user();
 
-        $normalizedType = $this->isStudent($request)
-            ? 'pocket_saver_wallet'
-            : $this->normalizeWalletType($data['walletType']);
+        try {
+            return DB::transaction(function () use ($user, $data): JsonResponse {
+                // Lock existing wallets for this user to prevent race conditions from concurrent clicks
+                $existingWallets = Wallet::query()
+                    ->where('user_id', $user->id)
+                    ->lockForUpdate()
+                    ->get();
 
-        if ($this->isStudent($request)) {
-            $existingStudentWallet = Wallet::query()
-                ->where('user_id', $request->user()->id)
-                ->where('wallet_type', 'pocket_saver_wallet')
-                ->first();
+                if ($user->isAdmin()) {
+                    $normalizedType = $this->normalizeWalletType($data['walletType']);
 
-            if ($existingStudentWallet) {
+                    if (! in_array($normalizedType, Wallet::ALLOWED_BUSINESS_TYPES, true)) {
+                        return response()->json([
+                            'message' => 'Invalid wallet type. Allowed types are Travel, Medical, and Pocket Saver.',
+                        ], 422);
+                    }
+
+                    if ($existingWallets->count() >= Wallet::MAX_BUSINESS_WALLETS) {
+                        return response()->json([
+                            'message' => 'Business accounts can have a maximum of 3 wallets: Travel, Medical, and Pocket Saver.',
+                        ], 422);
+                    }
+
+                    if ($existingWallets->contains('wallet_type', $normalizedType)) {
+                        $label = $this->defaultWalletName($normalizedType);
+                        return response()->json([
+                            'message' => "You already have an active {$label}.",
+                        ], 422);
+                    }
+                } elseif ($user->isStudent()) {
+                    if ($data['walletType'] !== Wallet::TYPE_POCKET_SAVER) {
+                        return response()->json([
+                            'message' => 'Student accounts can only use Pocket Saver Wallet.',
+                        ], 422);
+                    }
+
+                    $existingStudentWallet = $existingWallets->firstWhere('wallet_type', Wallet::TYPE_POCKET_SAVER);
+
+                    if ($existingStudentWallet) {
+                        return response()->json([
+                            'message' => 'Student accounts can activate only one wallet.',
+                        ], 422);
+                    }
+
+                    $this->migrateStudentLegacyWalletIfNeeded((string) $user->id);
+
+                    $migratedWallet = Wallet::query()
+                        ->where('user_id', $user->id)
+                        ->where('wallet_type', Wallet::TYPE_POCKET_SAVER)
+                        ->first();
+
+                    if ($migratedWallet) {
+                        return response()->json(ApiTransformer::wallet($migratedWallet, $this->walletMetrics($migratedWallet)), 201);
+                    }
+
+                    if ($existingWallets->count() >= Wallet::MAX_STUDENT_WALLETS) {
+                        return response()->json([
+                            'message' => 'Student accounts can activate only one wallet.',
+                        ], 422);
+                    }
+
+                    $normalizedType = Wallet::TYPE_POCKET_SAVER;
+                } else {
+                    $normalizedType = $this->normalizeWalletType($data['walletType']);
+
+                    if (! in_array($normalizedType, Wallet::ALLOWED_BUSINESS_TYPES, true)) {
+                        return response()->json([
+                            'message' => 'Invalid wallet type. Allowed types are Travel, Medical, and Pocket Saver.',
+                        ], 422);
+                    }
+
+                    if ($existingWallets->count() >= Wallet::MAX_BUSINESS_WALLETS) {
+                        return response()->json([
+                            'message' => 'Business accounts can have a maximum of 3 wallets: Travel, Medical, and Pocket Saver.',
+                        ], 422);
+                    }
+
+                    if ($existingWallets->contains('wallet_type', $normalizedType)) {
+                        $label = $this->defaultWalletName($normalizedType);
+                        return response()->json([
+                            'message' => "You already have an active {$label}.",
+                        ], 422);
+                    }
+                }
+
+                $wallet = Wallet::create([
+                    'user_id' => $user->id,
+                    'name' => trim((string) ($data['name'] ?? '')) !== '' ? trim((string) $data['name']) : $this->defaultWalletName($normalizedType),
+                    'wallet_type' => $normalizedType,
+                    'balance' => $data['balance'] ?? 0,
+                    'last_withdrawal_date' => $normalizedType === Wallet::TYPE_POCKET_SAVER ? now()->subDays(16) : null,
+                ]);
+
+                return response()->json(ApiTransformer::wallet($wallet, $this->walletMetrics($wallet)), 201);
+            });
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            if (! $user->isAdmin() && $user->isStudent()) {
                 return response()->json(['message' => 'Student accounts can activate only one wallet.'], 422);
             }
-
-            $this->migrateStudentLegacyWalletIfNeeded((string) $request->user()->id);
-
-            $migratedWallet = Wallet::query()
-                ->where('user_id', $request->user()->id)
-                ->where('wallet_type', 'pocket_saver_wallet')
-                ->first();
-
-            if ($migratedWallet) {
-                return response()->json(ApiTransformer::wallet($migratedWallet, $this->walletMetrics($migratedWallet)), 201);
+            $normalizedType = $this->normalizeWalletType($data['walletType']);
+            $label = $this->defaultWalletName($normalizedType);
+            return response()->json(['message' => "You already have an active {$label}."], 422);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() === '23505' || $e->getCode() === '23000' || str_contains($e->getMessage(), 'UNIQUE')) {
+                if (! $user->isAdmin() && $user->isStudent()) {
+                    return response()->json(['message' => 'Student accounts can activate only one wallet.'], 422);
+                }
+                $normalizedType = $this->normalizeWalletType($data['walletType']);
+                $label = $this->defaultWalletName($normalizedType);
+                return response()->json(['message' => "You already have an active {$label}."], 422);
             }
+            throw $e;
         }
-
-        $walletCount = Wallet::query()->where('user_id', $request->user()->id)->count();
-        if ($walletCount >= Wallet::MAX_WALLETS) {
-            return response()->json(['message' => 'Maximum '.Wallet::MAX_WALLETS.' wallets allowed per user.'], 422);
-        }
-
-        $wallet = Wallet::create([
-            'user_id' => $request->user()->id,
-            'name' => trim((string) ($data['name'] ?? '')) !== '' ? trim((string) $data['name']) : $this->defaultWalletName($normalizedType),
-            'wallet_type' => $normalizedType,
-            'balance' => $data['balance'] ?? 0,
-        ]);
-
-        return response()->json(ApiTransformer::wallet($wallet, $this->walletMetrics($wallet)), 201);
     }
 
     public function show(Request $request, Wallet $wallet): JsonResponse
@@ -120,16 +204,35 @@ class WalletController extends Controller
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
-            'walletType' => ['sometimes', 'in:default_wallet,cash_wallet,personal_wallet,travelling_wallet,medical_emergency_wallet,pocket_saver_wallet'],
+            'walletType' => ['sometimes', 'string'],
         ]);
 
-        if ($this->isStudent($request) && array_key_exists('walletType', $data) && $data['walletType'] !== 'pocket_saver_wallet') {
+        $user = $request->user();
+
+        if (! $user->isAdmin() && $user->isStudent() && array_key_exists('walletType', $data) && $data['walletType'] !== Wallet::TYPE_POCKET_SAVER) {
             return response()->json(['message' => 'Student accounts can only use Pocket Saver Wallet.'], 422);
         }
 
         $normalizedType = array_key_exists('walletType', $data)
-            ? ($this->isStudent($request) ? 'pocket_saver_wallet' : $this->normalizeWalletType($data['walletType']))
+            ? (($user->isAdmin() || ! $user->isStudent()) ? $this->normalizeWalletType($data['walletType']) : Wallet::TYPE_POCKET_SAVER)
             : $wallet->wallet_type;
+
+        $allowedTypes = ($user->isAdmin() || ! $user->isStudent()) ? Wallet::ALLOWED_BUSINESS_TYPES : Wallet::ALLOWED_STUDENT_TYPES;
+        if (! in_array($normalizedType, $allowedTypes, true)) {
+            return response()->json(['message' => 'Invalid wallet type. Allowed types are Travel, Medical, and Pocket Saver.'], 422);
+        }
+
+        if ($normalizedType !== $wallet->wallet_type) {
+            $duplicate = Wallet::where('user_id', $user->id)
+                ->where('wallet_type', $normalizedType)
+                ->where('id', '!=', $wallet->id)
+                ->exists();
+
+            if ($duplicate) {
+                $label = $this->defaultWalletName($normalizedType);
+                return response()->json(['message' => "You already have an active {$label}."], 422);
+            }
+        }
 
         $wallet->fill([
             'name' => $data['name'] ?? $wallet->name,
@@ -285,41 +388,48 @@ class WalletController extends Controller
     private function normalizeWalletType(string $walletType): string
     {
         return match ($walletType) {
-            'default_wallet', 'cash_wallet', 'personal_wallet', 'travelling_wallet' => 'travelling_wallet',
-            'medical_emergency_wallet' => 'medical_emergency_wallet',
-            'pocket_saver_wallet' => 'pocket_saver_wallet',
-            default => 'travelling_wallet',
+            'default_wallet', 'cash_wallet', 'personal_wallet', 'travelling_wallet' => Wallet::TYPE_TRAVELLING,
+            'medical_emergency_wallet' => Wallet::TYPE_MEDICAL_EMERGENCY,
+            'pocket_saver_wallet' => Wallet::TYPE_POCKET_SAVER,
+            default => $walletType,
         };
     }
 
     private function defaultWalletName(string $walletType): string
     {
         return match ($walletType) {
-            'medical_emergency_wallet' => 'Medical Emergency Wallet',
-            'pocket_saver_wallet' => 'Pocket Saver Wallet',
+            Wallet::TYPE_MEDICAL_EMERGENCY => 'Medical Emergency Wallet',
+            Wallet::TYPE_POCKET_SAVER => 'Pocket Saver Wallet',
             default => 'Travelling Wallet',
         };
     }
 
     private function isStudent(Request $request): bool
     {
-        $role = (string) ($request->user()?->role ?? 'student');
-        return in_array($role, ['student', 'user', 'super_admin_student'], true);
+        if ($request->user()?->isAdmin()) {
+            return false;
+        }
+
+        return $request->user()?->isStudent() ?? true;
     }
 
     private function assertStudentWalletAccess(Request $request, Wallet $wallet): void
     {
+        if ($request->user()?->isAdmin()) {
+            return;
+        }
+
         if (! $this->isStudent($request)) {
             return;
         }
 
         $primaryWalletId = Wallet::query()
             ->where('user_id', $request->user()->id)
-            ->where('wallet_type', 'pocket_saver_wallet')
+            ->where('wallet_type', Wallet::TYPE_POCKET_SAVER)
             ->oldest('id')
             ->value('id');
 
-        if ($wallet->wallet_type !== 'pocket_saver_wallet' || ! $primaryWalletId || (string) $wallet->id !== (string) $primaryWalletId) {
+        if ($wallet->wallet_type !== Wallet::TYPE_POCKET_SAVER || ! $primaryWalletId || (string) $wallet->id !== (string) $primaryWalletId) {
             abort(response()->json([
                 'message' => 'Student accounts can access only Pocket Saver Wallet.',
             ], 403));
@@ -330,7 +440,7 @@ class WalletController extends Controller
     {
         $hasPocketSaverWallet = Wallet::query()
             ->where('user_id', $userId)
-            ->where('wallet_type', 'pocket_saver_wallet')
+            ->where('wallet_type', Wallet::TYPE_POCKET_SAVER)
             ->exists();
 
         if ($hasPocketSaverWallet) {
@@ -347,7 +457,7 @@ class WalletController extends Controller
         }
 
         $legacyWallet->fill([
-            'wallet_type' => 'pocket_saver_wallet',
+            'wallet_type' => Wallet::TYPE_POCKET_SAVER,
             'name' => trim((string) $legacyWallet->name) !== '' ? $legacyWallet->name : 'Pocket Saver Wallet',
         ]);
 

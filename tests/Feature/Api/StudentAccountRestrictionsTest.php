@@ -123,7 +123,7 @@ class StudentAccountRestrictionsTest extends TestCase
         );
     }
 
-    public function test_student_index_returns_only_one_pocket_saver_wallet_even_with_duplicates(): void
+    public function test_student_index_returns_only_one_pocket_saver_wallet_even_with_other_wallets(): void
     {
         $student = User::factory()->create([
             'role' => 'student',
@@ -136,10 +136,10 @@ class StudentAccountRestrictionsTest extends TestCase
             'balance' => 200,
         ]);
 
-        $secondPocket = Wallet::create([
+        $secondWallet = Wallet::create([
             'user_id' => $student->id,
-            'name' => 'Pocket B',
-            'wallet_type' => 'pocket_saver_wallet',
+            'name' => 'Medical B',
+            'wallet_type' => 'medical_emergency_wallet',
             'balance' => 300,
         ]);
 
@@ -150,9 +150,18 @@ class StudentAccountRestrictionsTest extends TestCase
             ->assertJsonCount(1)
             ->assertJsonPath('0._id', (string) $firstPocket->id);
 
-        $this->getJson('/api/wallets/'.$secondPocket->id)
+        $this->getJson('/api/wallets/'.$secondWallet->id)
             ->assertStatus(403)
             ->assertJsonFragment(['message' => 'Student accounts can access only Pocket Saver Wallet.']);
+
+        // Verify database unique constraint prevents duplicate wallet of same type
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        Wallet::create([
+            'user_id' => $student->id,
+            'name' => 'Duplicate Pocket',
+            'wallet_type' => 'pocket_saver_wallet',
+            'balance' => 100,
+        ]);
     }
 
     public function test_legacy_user_role_is_restricted_to_single_pocket_saver_wallet(): void

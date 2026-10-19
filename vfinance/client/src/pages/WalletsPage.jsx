@@ -36,17 +36,22 @@ const walletTypes = [
 ];
 
 const typeMeta = Object.fromEntries(walletTypes.map((item) => [item.value, item]));
-const maxWallets = 8;
+const maxWallets = 3;
 const studentWalletType = 'pocket_saver_wallet';
 
 const WalletsPage = () => {
   const { user } = useAuth();
+  const isAdmin = ['admin', 'super_admin'].includes(user?.role) || Boolean(user?.isSuperAdmin);
   const interfaceRole = user?.portalRole || user?.role;
-  const isStudent = ['student', 'user'].includes(interfaceRole);
+  const isStudent = !isAdmin && ['student', 'user', 'super_admin_student'].includes(interfaceRole);
   const [wallets, setWallets] = useState([]);
   const [walletType, setWalletType] = useState(studentWalletType);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const activeWalletTypes = useMemo(() => {
+    return new Set(wallets.map((w) => (w.walletType === 'personal_wallet' ? 'travelling_wallet' : w.walletType)));
+  }, [wallets]);
 
   const availableWalletTypes = useMemo(() => {
     if (isStudent) {
@@ -57,10 +62,19 @@ const WalletsPage = () => {
   }, [isStudent]);
 
   useEffect(() => {
-    if (isStudent && walletType !== studentWalletType) {
-      setWalletType(studentWalletType);
+    if (isStudent) {
+      if (walletType !== studentWalletType) {
+        setWalletType(studentWalletType);
+      }
+    } else {
+      if (activeWalletTypes.has(walletType)) {
+        const nextAvailable = availableWalletTypes.find((item) => !activeWalletTypes.has(item.value));
+        if (nextAvailable) {
+          setWalletType(nextAvailable.value);
+        }
+      }
     }
-  }, [isStudent, walletType]);
+  }, [isStudent, walletType, activeWalletTypes, availableWalletTypes]);
 
   const effectiveMaxWallets = isStudent ? 1 : maxWallets;
 
@@ -88,7 +102,7 @@ const WalletsPage = () => {
     [wallets]
   );
 
-  const canCreateMore = wallets.length < effectiveMaxWallets;
+  const canCreateMore = wallets.length < effectiveMaxWallets && activeWalletTypes.size < effectiveMaxWallets;
   const selectedMeta = typeMeta[walletType] || typeMeta[studentWalletType];
 
   const formatINRPrecise = (amount = 0) => {
@@ -102,17 +116,26 @@ const WalletsPage = () => {
 
   const submit = async (event) => {
     event.preventDefault();
+    if (submitting) return;
 
     setError('');
     setSubmitting(true);
 
     try {
       if (!canCreateMore) {
-        setError(`Maximum ${effectiveMaxWallets} wallets can be activated per user.`);
+        setError(
+          isStudent
+            ? 'Student accounts can have only one Pocket Saver wallet.'
+            : 'Business accounts can have a maximum of 3 wallets: Travel, Medical, and Pocket Saver.'
+        );
+        return;
+      }
+      if (activeWalletTypes.has(walletType)) {
+        const label = typeMeta[walletType]?.label || 'wallet';
+        setError(`You already have an active ${label}.`);
         return;
       }
       await api.post('/wallets', { walletType });
-      setWalletType(isStudent ? studentWalletType : walletType);
       await loadWallets();
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to save wallet right now');
@@ -194,20 +217,31 @@ const WalletsPage = () => {
                 {availableWalletTypes.map((item) => {
                   const Icon = item.icon;
                   const selected = walletType === item.value;
+                  const isActive = activeWalletTypes.has(item.value);
                   return (
                     <button
                       key={item.value}
                       type="button"
+                      disabled={isActive}
                       onClick={() => setWalletType(item.value)}
                       className={`rounded-xl border px-3 py-2 text-left transition ${
-                        selected
+                        isActive
+                          ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-70'
+                          : selected
                           ? `border-transparent bg-gradient-to-r ${item.accent} text-white shadow-md`
                           : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                       }`}
                     >
-                      <div className="inline-flex items-center gap-2 text-xs font-semibold">
-                        <Icon className="h-4 w-4" />
-                        {item.label.replace(' Wallet', '')}
+                      <div className="inline-flex items-center justify-between w-full text-xs font-semibold">
+                        <span className="inline-flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          {item.label.replace(' Wallet', '')}
+                        </span>
+                        {isActive && (
+                          <span className="text-[10px] font-normal uppercase tracking-wider bg-slate-200/80 text-slate-500 px-1.5 py-0.5 rounded">
+                            Active
+                          </span>
+                        )}
                       </div>
                     </button>
                   );
@@ -219,7 +253,7 @@ const WalletsPage = () => {
             <button
               className="btn-gradient inline-flex items-center justify-center gap-2 lg:col-span-3"
               type="submit"
-              disabled={submitting || !canCreateMore}
+              disabled={submitting || !canCreateMore || activeWalletTypes.has(walletType)}
             >
               <Plus className="h-4 w-4" />
               {submitting ? 'Activating...' : 'Activate Wallets'}
@@ -233,7 +267,7 @@ const WalletsPage = () => {
             <p className="text-sm font-semibold text-amber-800">
               {isStudent
                 ? 'Student accounts can keep only one Pocket Saver Wallet active.'
-                : 'Up to 8 wallets can be active at a time.'}
+                : 'Business accounts can have a maximum of 3 wallets: Travel, Medical, and Pocket Saver.'}
             </p>
         </div>
       )}
