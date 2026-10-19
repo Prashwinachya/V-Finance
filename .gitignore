@@ -9,6 +9,7 @@
 .env
 .env.backup
 .env.production
+!/vfinance/client/.env.production
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml
