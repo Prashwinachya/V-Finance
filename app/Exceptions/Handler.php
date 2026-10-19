@@ -49,4 +49,14 @@ class Handler extends ExceptionHandler
             return null;
         });
     }
+
+    /**
+     * Convert an authentication exception into a response.
+     */
+    protected function unauthenticated($request, \Illuminate\Auth\AuthenticationException $exception)
+    {
+        return $request->expectsJson() || $request->is('api/*')
+            ? response()->json(['message' => $exception->getMessage() ?: 'Unauthenticated.'], 401)
+            : redirect()->guest($exception->redirectTo() ?? '/login');
+    }
 }

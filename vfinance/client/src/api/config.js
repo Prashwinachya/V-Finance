@@ -1,6 +1,17 @@
-const configuredApiBaseUrl = String(import.meta.env.VITE_API_URL || '/api').trim();
+const rawApiUrl = String(import.meta.env.VITE_API_URL || '').trim();
 
-export const apiBaseUrl = (configuredApiBaseUrl || '/api').replace(/\/$/, '');
+const getApiBaseUrl = () => {
+  if (import.meta.env.DEV) {
+    if (!rawApiUrl || rawApiUrl === '/api') return '/api';
+    if (!rawApiUrl.includes('localhost') && !rawApiUrl.includes('127.0.0.1')) {
+      return '/api';
+    }
+    return rawApiUrl.replace(/\/$/, '');
+  }
+  return (rawApiUrl || '/api').replace(/\/$/, '');
+};
+
+export const apiBaseUrl = getApiBaseUrl();
 
 export const apiOrigin = apiBaseUrl.startsWith('http')
   ? apiBaseUrl.replace(/\/api\/?$/, '')

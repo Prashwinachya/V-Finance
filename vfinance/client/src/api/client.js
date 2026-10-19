@@ -3,6 +3,10 @@ import { apiBaseUrl } from './config';
 
 const api = axios.create({
   baseURL: apiBaseUrl,
+  headers: {
+    Accept: 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
+  },
 });
 
 api.interceptors.request.use((config) => {
