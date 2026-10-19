@@ -6,7 +6,7 @@
         "dev:client": "npm --prefix vfinance/client run dev",
         "dev:frontend": "npm --prefix vfinance/client run dev",
         "dev:backend": "php artisan serve --host=127.0.0.1 --port=8000",
-        "build": "npm --prefix vfinance/client run build && (cp -r vfinance/client/dist ./dist 2>/dev/null || true)"
+        "build": "env -u npm_config_cache_dir -u NPM_CONFIG_CACHE_DIR npm --prefix vfinance/client run build && (cp -r vfinance/client/dist ./dist 2>/dev/null || true)"
     },
     "devDependencies": {
         "concurrently": "^9.2.1"

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "env -u npm_config_cache_dir -u NPM_CONFIG_CACHE_DIR vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

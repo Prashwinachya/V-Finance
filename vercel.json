@@ -1,17 +1,18 @@
 {
-  "buildCommand": "npm --prefix vfinance/client run build",
+  "buildCommand": "env -u npm_config_cache_dir -u NPM_CONFIG_CACHE_DIR npm --prefix vfinance/client run build",
+  "installCommand": "env -u npm_config_cache_dir -u NPM_CONFIG_CACHE_DIR npm --prefix vfinance/client install",
   "outputDirectory": "vfinance/client/dist",
   "build": {
     "env": {
-      "VITE_API_URL": "https://emissions-neon-coupled-family.trycloudflare.com/api"
+      "VITE_API_URL": "https://cir-breeds-stories-trivia.trycloudflare.com/api"
     }
   },
   "env": {
-    "VITE_API_URL": "https://emissions-neon-coupled-family.trycloudflare.com/api"
+    "VITE_API_URL": "https://cir-breeds-stories-trivia.trycloudflare.com/api"
   },
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://emissions-neon-coupled-family.trycloudflare.com/api/:path*" },
-    { "source": "/uploads/:path*", "destination": "https://emissions-neon-coupled-family.trycloudflare.com/uploads/:path*" },
+    { "source": "/api/:path*", "destination": "https://cir-breeds-stories-trivia.trycloudflare.com/api/:path*" },
+    { "source": "/uploads/:path*", "destination": "https://cir-breeds-stories-trivia.trycloudflare.com/uploads/:path*" },
     { "source": "/((?!api/).*)", "destination": "/" }
   ]
 }

@@ -1,7 +1,10 @@
 {
+  "buildCommand": "env -u npm_config_cache_dir -u NPM_CONFIG_CACHE_DIR npm run build",
+  "installCommand": "env -u npm_config_cache_dir -u NPM_CONFIG_CACHE_DIR npm install",
+  "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://emissions-neon-coupled-family.trycloudflare.com/api/:path*" },
-    { "source": "/uploads/:path*", "destination": "https://emissions-neon-coupled-family.trycloudflare.com/uploads/:path*" },
+    { "source": "/api/:path*", "destination": "https://cir-breeds-stories-trivia.trycloudflare.com/api/:path*" },
+    { "source": "/uploads/:path*", "destination": "https://cir-breeds-stories-trivia.trycloudflare.com/uploads/:path*" },
     { "source": "/(.*)", "destination": "/" }
   ]
 }
