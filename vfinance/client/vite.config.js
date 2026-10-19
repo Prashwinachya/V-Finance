@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -6,8 +6,30 @@ import { fileURLToPath } from 'node:url'
 
 import http from 'node:http'
 import { spawn } from 'node:child_process'
+import process from 'node:process'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+function verifyProductionApiUrl(mode) {
+  return {
+    name: 'verify-production-api-url',
+    configResolved(config) {
+      if (config.command === 'build') {
+        const env = loadEnv(mode || config.mode, __dirname, 'VITE_')
+        const apiUrl = (process.env.VITE_API_URL || env.VITE_API_URL || '').trim()
+
+        if (!apiUrl || apiUrl === '/api' || !/^https?:\/\//i.test(apiUrl)) {
+          throw new Error(
+            `\n[FATAL BUILD ERROR] VITE_API_URL must be configured with an absolute URL (e.g. https://<laravel-host>/api) for production builds.\n` +
+            `Current value: "${apiUrl || '(empty)'}"\n` +
+            `Deploying with a relative "/api" on Vercel causes all API requests (like /api/auth/register) to return 404 NOT_FOUND.\n`
+          )
+        }
+        console.log(`[vite] ✓ Verified production VITE_API_URL: ${apiUrl}`)
+      }
+    },
+  }
+}
 
 function ensureLaravelBackend() {
   let backendProcess = null
@@ -76,7 +98,7 @@ function syncToLaravelPublic() {
 }
 
 // https://vite.dev/config/
-export default defineConfig(() => ({
+export default defineConfig(({ mode }) => ({
   base: '/',
   server: {
     host: 'localhost',
@@ -98,5 +120,5 @@ export default defineConfig(() => ({
     emptyOutDir: true,
     manifest: true,
   },
-  plugins: [react(), syncToLaravelPublic(), ensureLaravelBackend()],
+  plugins: [react(), verifyProductionApiUrl(mode), syncToLaravelPublic(), ensureLaravelBackend()],
 }))

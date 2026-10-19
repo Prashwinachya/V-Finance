@@ -1,5 +1,7 @@
 {
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/" }
+    { "source": "/api/:path*", "destination": "https://emissions-neon-coupled-family.trycloudflare.com/api/:path*" },
+    { "source": "/uploads/:path*", "destination": "https://emissions-neon-coupled-family.trycloudflare.com/uploads/:path*" },
+    { "source": "/(.*)", "destination": "/" }
   ]
 }
