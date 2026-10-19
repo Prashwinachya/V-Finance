@@ -1,8 +1,7 @@
-import { ChevronDown, LayoutDashboard, Receipt, Plane, Wallet, ShieldCheck, Landmark, Settings, Radar, Coins, CreditCard, Building2 } from 'lucide-react';
+import { LayoutDashboard, Receipt, Plane, Wallet, ShieldCheck, Landmark, Radar, Coins, CreditCard, Building2 } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import UserAvatar from './UserAvatar';
+import AccountMenu from './AccountMenu';
 
 const menu = [
   {
@@ -79,7 +78,6 @@ const Layout = ({ children }) => {
   const roleBadgeClass = user?.role === 'super_admin'
     ? 'border-purple-100 bg-purple-50 text-purple-700'
     : 'border-rose-100 bg-rose-50 text-rose-700';
-  const [open, setOpen] = useState(false);
   const navItems = menu.filter((item) => {
     const isAdminRoute = item.path === '/admin';
     if (isAdminRoute && !['admin', 'super_admin'].includes(user?.role)) {
@@ -146,44 +144,15 @@ const Layout = ({ children }) => {
             </div>
           </div>
 
-          <div className="relative order-2 ml-auto shrink-0">
-            <div className="flex items-center gap-2">
-              {roleBadgeLabel && (
-                <span className={`hidden sm:inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${roleBadgeClass}`}>
-                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                  {roleBadgeLabel}
-                </span>
-              )}
-
-              <button
-                onClick={() => setOpen((prev) => !prev)}
-                className="inline-flex max-w-[220px] items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm"
-              >
-                <UserAvatar user={user} size="h-8 w-8" textSize="text-sm" />
-                <span className="hidden max-w-[130px] truncate pr-1 text-sm font-semibold text-slate-600 sm:inline">{user?.name || 'User'}</span>
-                <ChevronDown size={16} className="text-slate-500" />
-              </button>
-            </div>
-
-            {open && (
-              <div className="absolute right-0 mt-2 w-52 rounded-xl border border-slate-100 bg-white p-2 shadow-lg">
-                <p className="px-3 py-2 text-xs text-slate-500">{user?.email}</p>
-                <Link
-                  to="/settings"
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  <Settings className="h-4 w-4 text-slate-500" />
-                  Settings
-                </Link>
-                <button
-                  onClick={logout}
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
-                >
-                  Logout
-                </button>
-              </div>
+          <div className="order-2 ml-auto shrink-0 flex items-center gap-2">
+            {roleBadgeLabel && (
+              <span className={`hidden sm:inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${roleBadgeClass}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {roleBadgeLabel}
+              </span>
             )}
+
+            <AccountMenu user={user} logout={logout} />
           </div>
         </nav>
       </header>

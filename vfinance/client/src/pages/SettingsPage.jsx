@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import {
   ShieldCheck, User, KeyRound, Bell, Eye, CreditCard,
   TrendingUp, Sliders, Activity, AlertTriangle, List, Search
 } from 'lucide-react';
 import api from '../api/client';
-import { useAuth } from '../context/AuthContext';
 
 import ProfileSettings from '../components/settings/ProfileSettings';
 import SecuritySettings from '../components/settings/SecuritySettings';
@@ -31,22 +31,40 @@ const NAV_ITEMS = [
 ];
 
 const SettingsPage = () => {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('profile');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+
+  const queryTab = searchParams.get('tab') || location.state?.tab;
+  const hasFingerprintParam = searchParams.get('setupFingerprint') === '1';
+
+  const [localTab, setLocalTab] = useState('profile');
+  const activeTab = hasFingerprintParam
+    ? 'security'
+    : (queryTab && NAV_ITEMS.some((i) => i.id === queryTab) ? queryTab : localTab);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [settings, setSettings] = useState(null);
 
   useEffect(() => {
-    loadSettings();
+    let ignore = false;
+    api.get('/settings')
+      .then((response) => {
+        if (!ignore) {
+          setSettings(response.data);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load settings', err);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
-  const loadSettings = async () => {
-    try {
-      const { data } = await api.get('/settings');
-      setSettings(data);
-    } catch (err) {
-      console.error('Failed to load settings', err);
-    }
+  const handleSelectTab = (tabId) => {
+    setLocalTab(tabId);
+    setSearchParams({ tab: tabId }, { replace: true });
   };
 
   const updateSetting = async (key, value) => {
@@ -99,7 +117,7 @@ const SettingsPage = () => {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => handleSelectTab(item.id)}
                   className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition ${isActive
                       ? 'bg-slate-900 text-white shadow-md'
                       : 'text-slate-600 hover:bg-slate-100'
