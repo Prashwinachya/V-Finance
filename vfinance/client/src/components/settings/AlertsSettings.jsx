@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Bell, AlertTriangle, TrendingUp, CreditCard, ShieldAlert } from 'lucide-react';
 
 const AlertsSettings = ({ settings, updateSetting }) => {

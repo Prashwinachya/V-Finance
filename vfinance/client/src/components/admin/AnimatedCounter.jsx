@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 
+const currencyFormatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
+const standardFormatter = new Intl.NumberFormat('en-IN');
+
 const AnimatedCounter = ({ value = 0, duration = 1.2, isCurrency = false, prefix = '', suffix = '' }) => {
   const [displayValue, setDisplayValue] = useState(0);
 
@@ -43,8 +46,8 @@ const AnimatedCounter = ({ value = 0, duration = 1.2, isCurrency = false, prefix
   }, [value, duration]);
 
   const formatted = isCurrency
-    ? new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(displayValue)
-    : displayValue.toLocaleString();
+    ? currencyFormatter.format(displayValue)
+    : standardFormatter.format(displayValue);
 
   return (
     <span className="font-extrabold tracking-tight">

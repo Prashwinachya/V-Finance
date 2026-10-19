@@ -14,6 +14,8 @@ const UserAvatar = ({ user, src: directSrc, previewUrl, size = 'h-8 w-8', textSi
         key={src}
         src={src}
         alt={user?.name ? `${user.name}'s Avatar` : 'Avatar'}
+        loading="lazy"
+        decoding="async"
         onError={() => setFailedUrl(rawSrc)}
         className={`${size} rounded-full object-cover ${className}`.trim()}
       />

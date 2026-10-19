@@ -97,10 +97,25 @@ const roleLabel = (role) => {
   return 'Student';
 };
 
+const LiveClockBadge = () => {
+  const [time, setTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timeText = time.toLocaleTimeString('en-IN', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+  return <p className="mt-1 text-2xl font-bold leading-tight text-white">{timeText}</p>;
+};
+
 const DashboardPage = () => {
   const { user } = useAuth();
   const interfaceRole = user?.portalRole || user?.role;
-  const [clock, setClock] = useState(new Date());
   const [dashboard, setDashboard] = useState(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [dashboardError, setDashboardError] = useState('');
@@ -134,8 +149,6 @@ const DashboardPage = () => {
 
   useEffect(() => {
     loadDashboard();
-    const timer = setInterval(() => setClock(new Date()), 1000);
-    return () => clearInterval(timer);
   }, []);
 
   const trend = useMemo(() => {
@@ -146,25 +159,28 @@ const DashboardPage = () => {
     };
   }, [dashboard]);
 
-  const dateText = clock.toLocaleDateString('en-IN', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const { greeting, dateText, monthSnapshot } = useMemo(() => {
+    const now = new Date();
+    const hours = now.getHours();
+    let greet = 'Good night';
+    if (hours >= 5 && hours < 12) greet = 'Good morning';
+    else if (hours >= 12 && hours < 17) greet = 'Good afternoon';
+    else if (hours >= 17 && hours < 21) greet = 'Good evening';
 
-  const timeText = clock.toLocaleTimeString('en-IN', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+    const formattedDate = now.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
 
-  const greeting = useMemo(() => {
-    const hours = clock.getHours();
-    if (hours >= 5 && hours < 12) return 'Good morning';
-    if (hours >= 12 && hours < 17) return 'Good afternoon';
-    if (hours >= 17 && hours < 21) return 'Good evening';
-    return 'Good night';
-  }, [clock]);
+    const snapshot = now.toLocaleDateString('en-IN', {
+      month: 'long',
+      year: 'numeric',
+    });
+
+    return { greeting: greet, dateText: formattedDate, monthSnapshot: snapshot };
+  }, []);
 
   const walletCount = Number(dashboard?.walletCount || 0);
 
@@ -298,7 +314,7 @@ const DashboardPage = () => {
           <div className="grid gap-3 rounded-2xl border border-white/25 bg-white/10 p-4 backdrop-blur-sm sm:grid-cols-2 lg:min-w-[320px] lg:grid-cols-1">
             <div>
               <p className="text-xs uppercase tracking-wide text-white/70">Current Time</p>
-              <p className="mt-1 text-2xl font-bold leading-tight text-white">{timeText}</p>
+              <LiveClockBadge />
             </div>
             <div className="rounded-xl border border-white/20 bg-white/10 p-3">
               <p className="text-xs text-white/70">Monthly Trend</p>
@@ -380,7 +396,7 @@ const DashboardPage = () => {
               </span>
               <div>
                 <p className="text-sm font-semibold text-slate-800">This Month Snapshot</p>
-                <p className="text-xs text-slate-500">{clock.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</p>
+                <p className="text-xs text-slate-500">{monthSnapshot}</p>
               </div>
             </div>
             <p className={`text-xs font-bold ${trend.positive ? 'text-emerald-600' : 'text-rose-600'}`}>{trend.text}</p>

@@ -1,7 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import api from '../api/client';
-
-console.log('=== AuthContext.jsx is loaded ===');
 
 const AuthContext = createContext(null);
 const USER_CACHE_KEY = 'vfinance_user_cache';
@@ -14,7 +12,6 @@ const loadCachedUser = () => {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' ? parsed : null;
-  // eslint-disable-next-line no-unused-vars
   } catch (_) {
     return null;
   }
@@ -53,33 +50,27 @@ const extractUserPayload = (responseData) => {
 };
 
 export const AuthProvider = ({ children }) => {
-  console.log('=== AuthProvider initializing ===');
-  
   const [user, setUser] = useState(() => loadCachedUser());
   const [loading, setLoading] = useState(true);
-  
-  console.log('=== Initial user state:', user);
 
-  const refreshMe = async () => {
-    console.log('=== refreshMe() called ===');
+  const refreshMe = useCallback(async () => {
     const response = await api.get('/auth/me');
     const payload = extractUserPayload(response.data);
     if (!payload) {
       throw new Error('Unable to parse authenticated user payload');
     }
-    console.log('=== refreshMe() payload:', payload);
     setUser(payload);
 
     const remember = Boolean(localStorage.getItem('vfinance_token'));
     saveCachedUser(payload, remember);
-  };
+  }, []);
 
   /**
    * Merge a partial or full user payload into the current auth state and
    * persist it to the cache. Used by ProfileSettings to update the context
    * immediately from the API response without a second /auth/me round-trip.
    */
-  const updateUser = (partialUser) => {
+  const updateUser = useCallback((partialUser) => {
     if (!partialUser || typeof partialUser !== 'object') return;
     setUser((prev) => {
       const merged = { ...(prev ?? {}), ...partialUser };
@@ -87,13 +78,11 @@ export const AuthProvider = ({ children }) => {
       saveCachedUser(merged, remember);
       return merged;
     });
-  };
+  }, []);
 
   useEffect(() => {
-    console.log('=== AuthProvider useEffect initial bootstrap ===');
     const bootstrap = async () => {
       const token = getStoredToken();
-      console.log('=== bootstrap - stored token:', token ? 'exists' : 'no token');
       
       if (!token) {
         setUser(null);
@@ -105,7 +94,6 @@ export const AuthProvider = ({ children }) => {
       try {
         await refreshMe();
       } catch (requestError) {
-        console.error('=== bootstrap refreshMe error:', requestError);
         const status = requestError?.response?.status;
 
         // Only force logout when token is actually invalid/expired.
@@ -121,16 +109,14 @@ export const AuthProvider = ({ children }) => {
     };
 
     bootstrap();
-  }, []);
+  }, [refreshMe]);
 
-  const login = async (email, password, remember = true, role = null) => {
-    console.log('=== login() called with email:', email, 'role:', role);
+  const login = useCallback(async (email, password, remember = true, role = null) => {
     const response = await api.post('/auth/login', {
       email,
       password,
       ...(role ? { role } : {}),
     });
-    console.log('=== login response:', response);
     const payload = extractUserPayload(response.data);
 
     if (remember) {
@@ -144,10 +130,9 @@ export const AuthProvider = ({ children }) => {
     }
     setUser(payload);
     return payload;
-  };
+  }, []);
 
-  const register = async (name, email, password, role = 'student', remember = true) => {
-    console.log('=== register() called ===');
+  const register = useCallback(async (name, email, password, role = 'student', remember = true) => {
     const response = await api.post('/auth/register', { name, email, password, role });
     const payload = extractUserPayload(response.data);
 
@@ -162,22 +147,19 @@ export const AuthProvider = ({ children }) => {
     }
     setUser(payload);
     return payload;
-  };
+  }, []);
 
-  const logout = () => {
-    console.log('=== logout() called ===');
+  const logout = useCallback(() => {
     localStorage.removeItem('vfinance_token');
     sessionStorage.removeItem('vfinance_token');
     clearCachedUser();
     setUser(null);
-  };
+  }, []);
 
   const value = useMemo(
     () => ({ user, loading, isAuthenticated: Boolean(user), login, register, logout, refreshMe, updateUser }),
-    [user, loading]
+    [user, loading, login, register, logout, refreshMe, updateUser]
   );
-
-  console.log('=== AuthProvider value:', value);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

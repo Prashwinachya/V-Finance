@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useDeferredValue } from 'react';
 import {
   Search,
   Filter,
@@ -16,6 +16,7 @@ import UserAvatar from '../UserAvatar';
 
 const TransactionsTable = ({ transactions = [] }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [typeFilter, setTypeFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date_desc');
@@ -52,8 +53,8 @@ const TransactionsTable = ({ transactions = [] }) => {
   const filtered = useMemo(() => {
     let result = [...transactions];
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+    if (deferredSearchQuery.trim()) {
+      const q = deferredSearchQuery.toLowerCase().trim();
       result = result.filter(
         (tx) =>
           tx.title?.toLowerCase().includes(q) ||
@@ -88,7 +89,7 @@ const TransactionsTable = ({ transactions = [] }) => {
     });
 
     return result;
-  }, [transactions, searchQuery, typeFilter, categoryFilter, sortBy]);
+  }, [transactions, deferredSearchQuery, typeFilter, categoryFilter, sortBy]);
 
   const totalItems = filtered.length;
   const totalPages = Math.ceil(totalItems / pageSize) || 1;

@@ -20,7 +20,14 @@ class AdminController extends Controller
 
         $totalUsers = (clone $scopedUsers)->count();
         $totalAdmins = (clone $scopedUsers)->whereIn('role', ['admin', 'super_admin', 'super_admin_student', 'super_admin_business'])->count();
-        $totalTransactions = Transaction::query()->whereIn('user_id', $scopedUserIds)->count();
+
+        $txStats = Transaction::query()
+            ->whereIn('user_id', $scopedUserIds)
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(amount), 0) as total_volume')
+            ->first();
+        $totalTransactions = (int) ($txStats->count ?? 0);
+        $totalVolume = (float) ($txStats->total_volume ?? 0);
+
         $totalBudgets = Budget::query()->whereIn('user_id', $scopedUserIds)->count();
 
         return response()->json([
@@ -35,7 +42,7 @@ class AdminController extends Controller
             ],
             'transactions' => [
                 'count' => $totalTransactions,
-                'totalVolume' => (float) Transaction::query()->whereIn('user_id', $scopedUserIds)->sum('amount'),
+                'totalVolume' => $totalVolume,
             ],
             'budgets' => [
                 'count' => $totalBudgets,
@@ -46,6 +53,7 @@ class AdminController extends Controller
     public function users(Request $request): JsonResponse
     {
         $items = $this->scopedUserQuery($request)
+            ->withCount(['transactions', 'budgets'])
             ->latest()
             ->get()
             ->map(fn (User $user): array => ApiTransformer::user($user));

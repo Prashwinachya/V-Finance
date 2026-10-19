@@ -86,6 +86,7 @@ function syncToLaravelPublic() {
 
       try {
         if (fs.existsSync(path.resolve(__dirname, '../../public'))) {
+          fs.rmSync(laravelPublicDir, { recursive: true, force: true })
           fs.mkdirSync(laravelPublicDir, { recursive: true })
           fs.cpSync(distDir, laravelPublicDir, { recursive: true })
           console.log('✓ Successfully synced build assets to public/vfinance for Laravel')
@@ -119,6 +120,28 @@ export default defineConfig(({ mode }) => ({
     outDir: 'dist',
     emptyOutDir: true,
     manifest: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('framer-motion')) {
+              return 'vendor-motion';
+            }
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            return 'vendor-libs';
+          }
+        },
+      },
+    },
   },
   plugins: [react(), verifyProductionApiUrl(mode), syncToLaravelPublic(), ensureLaravelBackend()],
 }))

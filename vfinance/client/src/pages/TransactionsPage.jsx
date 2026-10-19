@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useDeferredValue } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { BarChart3, Layers3, Plus, Fingerprint, KeyRound, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
@@ -9,6 +9,15 @@ import { clearDraft, loadDraft, saveDraft } from '../utils/draftStorage';
 import { requestPaymentToken } from '../utils/paymentVerification';
 
 const donutColors = ['#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b'];
+
+const inrPreciseFormatter = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const formatINRPrecise = (amount = 0) => inrPreciseFormatter.format(amount);
 
 const emptyForm = {
   title: '',
@@ -34,6 +43,7 @@ const TransactionsPage = () => {
   const [customCategories, setCustomCategories] = useState([]);
   const [categoryDraft, setCategoryDraft] = useState('');
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [typeFilter, setTypeFilter] = useState('all');
   const [visibleCount, setVisibleCount] = useState(10);
   const [actionError, setActionError] = useState('');
@@ -153,7 +163,7 @@ const TransactionsPage = () => {
   }, [transactions, customCategories, form.category]);
 
   const filteredTransactions = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalized = deferredQuery.trim().toLowerCase();
     return transactions.filter((item) => {
       const matchesType = typeFilter === 'all' ? true : item.type === typeFilter;
       const matchesQuery =
@@ -162,18 +172,9 @@ const TransactionsPage = () => {
         String(item.category || '').toLowerCase().includes(normalized);
       return matchesType && matchesQuery;
     });
-  }, [transactions, query, typeFilter]);
+  }, [transactions, deferredQuery, typeFilter]);
 
   const visibleTransactions = useMemo(() => filteredTransactions.slice(0, visibleCount), [filteredTransactions, visibleCount]);
-
-  const formatINRPrecise = (amount = 0) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const badgeClass = (value) => {
     const key = String(value || 'General').toLowerCase();

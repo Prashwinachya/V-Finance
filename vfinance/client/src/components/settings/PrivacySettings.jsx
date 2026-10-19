@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Eye, EyeOff, Download, Trash2, Database, Shield } from 'lucide-react';
-import api from '../../api/client';
 
 const PrivacySettings = ({ settings, updateSetting }) => {
   const privacy = settings?.privacy_config || {};

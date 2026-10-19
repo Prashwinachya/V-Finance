@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   LayoutDashboard,
   Receipt,
@@ -90,21 +90,23 @@ const Layout = ({ children }) => {
       ? 'border-purple-200/80 bg-purple-50/90 text-purple-700 shadow-purple-100'
       : 'border-rose-200/80 bg-rose-50/90 text-rose-700 shadow-rose-100';
 
-  const navItems = menu.filter((item) => {
-    const isAdminRoute = item.path === '/admin';
-    if (isAdminRoute && !['admin', 'super_admin'].includes(user?.role)) {
-      return false;
-    }
+  const navItems = useMemo(() => {
+    return menu.filter((item) => {
+      const isAdminRoute = item.path === '/admin';
+      if (isAdminRoute && !['admin', 'super_admin'].includes(user?.role)) {
+        return false;
+      }
 
-    const isLoanOptimizerRoute = item.path === '/loans/optimizer';
-    if (isLoanOptimizerRoute && interfaceRole !== 'business_user') {
-      return false;
-    }
+      const isLoanOptimizerRoute = item.path === '/loans/optimizer';
+      if (isLoanOptimizerRoute && interfaceRole !== 'business_user') {
+        return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
+  }, [user?.role, interfaceRole]);
 
-  const routeAccent = (() => {
+  const routeAccent = useMemo(() => {
     const path = location.pathname;
     if (path.startsWith('/transactions')) return 'from-emerald-500 via-teal-500 to-cyan-500';
     if (path.startsWith('/trip-planner')) return 'from-rose-500 via-pink-500 to-red-500';
@@ -116,7 +118,7 @@ const Layout = ({ children }) => {
     if (path.startsWith('/admin')) return 'from-purple-600 via-fuchsia-600 to-pink-600';
     if (path.startsWith('/settings')) return 'from-slate-600 via-slate-700 to-slate-900';
     return 'from-pink-500 via-rose-500 to-purple-600';
-  })();
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-[#FFF5F7] text-slate-800">

@@ -3,7 +3,7 @@ import { ShieldAlert, KeyRound, Fingerprint, Smartphone, Laptop, Trash2, Lock, S
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { startRegistration } from '@simplewebauthn/browser';
-import { ensureBiometricSupport, formatBiometricError, getCurrentBiometricHost, needsBiometricReenrollment } from '../../utils/paymentVerification';
+import { ensureBiometricSupport, formatBiometricError } from '../../utils/paymentVerification';
 import { useNavigate } from 'react-router-dom';
 
 const SecuritySettings = () => {
@@ -25,7 +25,6 @@ const SecuritySettings = () => {
   const fingerprintCount = Number(user?.fingerprintCount || (user?.hasBiometricCredential ? 1 : 0));
   const maxFingerprints = 3;
   const canAddFingerprint = fingerprintCount < maxFingerprints;
-  const biometricNeedsReenrollment = needsBiometricReenrollment(user);
 
   useEffect(() => {
     loadSessions();
@@ -57,7 +56,7 @@ const SecuritySettings = () => {
       setNewPassword('');
       setConfirmPassword('');
       setMessage('Password updated successfully');
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to update password');
     } finally {
       setBusy(false);
@@ -97,7 +96,7 @@ const SecuritySettings = () => {
       await refreshMe();
       setIsResettingPin(false);
       setMessage('Payment PIN set successfully');
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to set PIN');
     } finally {
       setBusy(false);
@@ -110,7 +109,7 @@ const SecuritySettings = () => {
       await api.delete(`/settings/sessions/${id}`);
       await loadSessions();
       setMessage('Session revoked');
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to revoke session');
     }
   };
@@ -121,7 +120,7 @@ const SecuritySettings = () => {
       await api.post('/settings/lock-account');
       logout();
       navigate('/login');
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to lock account');
     }
   };

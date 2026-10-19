@@ -9,11 +9,21 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
     background-image: 
       radial-gradient(circle at 10% 0%, rgba(244, 114, 182, 0.12), transparent 35%),
       radial-gradient(circle at 90% 12%, rgba(168, 85, 247, 0.1), transparent 35%),
       radial-gradient(circle at 50% 50%, rgba(251, 113, 133, 0.04), transparent 50%);
-    background-attachment: fixed;
+    transform: translateZ(0);
+    will-change: transform;
   }
 }
 
@@ -103,4 +113,15 @@
   background: linear-gradient(90deg, #f1f5f9 25%, #fce7f3 37%, #f1f5f9 63%);
   background-size: 200% 100%;
   animation: shimmer 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

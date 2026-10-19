@@ -35,37 +35,26 @@ class DashboardController extends Controller
             });
         };
 
-        $income = (float) Transaction::query()
-            ->where('user_id', $user->id)
-            ->where('user_deleted', false)
-            ->where('type', 'income')
-            ->tap($applyPrimaryBankFilter)
-            ->sum('amount');
+        $now = Carbon::now();
+        $startOfMonth = $now->copy()->startOfMonth()->toDateString();
+        $endOfMonth = $now->copy()->endOfMonth()->toDateString();
 
-        $expense = (float) Transaction::query()
+        $totals = Transaction::query()
             ->where('user_id', $user->id)
             ->where('user_deleted', false)
-            ->where('type', 'expense')
             ->tap($applyPrimaryBankFilter)
-            ->sum('amount');
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as total_income,
+                COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as total_expense,
+                COALESCE(SUM(CASE WHEN type = 'income' AND date >= ? AND date <= ? THEN amount ELSE 0 END), 0) as monthly_income,
+                COALESCE(SUM(CASE WHEN type = 'expense' AND date >= ? AND date <= ? THEN amount ELSE 0 END), 0) as monthly_expense
+            ", [$startOfMonth, $endOfMonth, $startOfMonth, $endOfMonth])
+            ->first();
 
-        $monthlyIncome = (float) Transaction::query()
-            ->where('user_id', $user->id)
-            ->where('user_deleted', false)
-            ->where('type', 'income')
-            ->whereMonth('date', now()->month)
-            ->whereYear('date', now()->year)
-            ->tap($applyPrimaryBankFilter)
-            ->sum('amount');
-
-        $monthlyExpense = (float) Transaction::query()
-            ->where('user_id', $user->id)
-            ->where('user_deleted', false)
-            ->where('type', 'expense')
-            ->whereMonth('date', now()->month)
-            ->whereYear('date', now()->year)
-            ->tap($applyPrimaryBankFilter)
-            ->sum('amount');
+        $income = (float) ($totals->total_income ?? 0);
+        $expense = (float) ($totals->total_expense ?? 0);
+        $monthlyIncome = (float) ($totals->monthly_income ?? 0);
+        $monthlyExpense = (float) ($totals->monthly_expense ?? 0);
 
         $recent = Transaction::query()
             ->with(['user', 'wallet'])
@@ -77,31 +66,27 @@ class DashboardController extends Controller
             ->get()
             ->map(fn (Transaction $transaction): array => ApiTransformer::transaction($transaction));
 
-        $monthlyOverview = collect(range(5, 0))->map(function (int $monthsBack) use ($user, $applyPrimaryBankFilter): array {
+        $sixMonthsStart = Carbon::now()->subMonths(5)->startOfMonth();
+        $recentSixMonthsTx = Transaction::query()
+            ->where('user_id', $user->id)
+            ->where('user_deleted', false)
+            ->where('date', '>=', $sixMonthsStart->toDateString())
+            ->tap($applyPrimaryBankFilter)
+            ->select(['type', 'amount', 'date'])
+            ->get();
+
+        $monthlyOverview = collect(range(5, 0))->map(function (int $monthsBack) use ($recentSixMonthsTx): array {
             $month = Carbon::now()->subMonths($monthsBack - 1);
+            $yearMonth = $month->format('Y-m');
 
-            $incomeValue = (float) Transaction::query()
-                ->where('user_id', $user->id)
-                ->where('user_deleted', false)
-                ->where('type', 'income')
-                ->whereYear('date', $month->year)
-                ->whereMonth('date', $month->month)
-                ->tap($applyPrimaryBankFilter)
-                ->sum('amount');
-
-            $expenseValue = (float) Transaction::query()
-                ->where('user_id', $user->id)
-                ->where('user_deleted', false)
-                ->where('type', 'expense')
-                ->whereYear('date', $month->year)
-                ->whereMonth('date', $month->month)
-                ->tap($applyPrimaryBankFilter)
-                ->sum('amount');
+            $monthTx = $recentSixMonthsTx->filter(function ($tx) use ($yearMonth): bool {
+                return $tx->date && str_starts_with((string) $tx->date, $yearMonth);
+            });
 
             return [
                 'month' => $month->format('M'),
-                'income' => $incomeValue,
-                'expense' => $expenseValue,
+                'income' => (float) $monthTx->where('type', 'income')->sum('amount'),
+                'expense' => (float) $monthTx->where('type', 'expense')->sum('amount'),
             ];
         })->values();
 
@@ -109,8 +94,8 @@ class DashboardController extends Controller
             ->where('user_id', $user->id)
             ->where('user_deleted', false)
             ->where('type', 'expense')
-            ->whereYear('date', now()->year)
-            ->whereMonth('date', now()->month)
+            ->where('date', '>=', $startOfMonth)
+            ->where('date', '<=', $endOfMonth)
             ->tap($applyPrimaryBankFilter)
             ->selectRaw("COALESCE(category, 'General') as name, SUM(amount) as value")
             ->groupBy('name')

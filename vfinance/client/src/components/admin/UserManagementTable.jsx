@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useDeferredValue } from 'react';
 import {
   Search,
   Filter,
@@ -30,6 +30,7 @@ const UserManagementTable = ({
   busy,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [roleFilter, setRoleFilter] = useState('all');
   const [portalFilter, setPortalFilter] = useState('all');
   const [sortBy, setSortBy] = useState('joined_desc');
@@ -41,8 +42,8 @@ const UserManagementTable = ({
     let result = [...users];
 
     // Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+    if (deferredSearchQuery.trim()) {
+      const q = deferredSearchQuery.toLowerCase().trim();
       result = result.filter(
         (u) =>
           u.name?.toLowerCase().includes(q) ||
@@ -96,7 +97,7 @@ const UserManagementTable = ({
     });
 
     return result;
-  }, [users, searchQuery, roleFilter, portalFilter, sortBy]);
+  }, [users, deferredSearchQuery, roleFilter, portalFilter, sortBy]);
 
   // Pagination calculation
   const totalItems = filteredUsers.length;
