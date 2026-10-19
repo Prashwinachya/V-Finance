@@ -97,13 +97,13 @@ const Layout = ({ children }) => {
       }
 
       const isLoanOptimizerRoute = item.path === '/loans/optimizer';
-      if (isLoanOptimizerRoute && interfaceRole !== 'business_user') {
+      if (isLoanOptimizerRoute && interfaceRole !== 'business_user' && user?.role !== 'super_admin' && !user?.isSuperAdmin) {
         return false;
       }
 
       return true;
     });
-  }, [user?.role, interfaceRole]);
+  }, [user?.role, user?.isSuperAdmin, interfaceRole]);
 
   const routeAccent = useMemo(() => {
     const path = location.pathname;

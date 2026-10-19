@@ -59,7 +59,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-C3AVXw8A.js",
+    "file": "assets/index-BDyHG8sy.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -86,11 +86,11 @@
       "src/pages/BankSyncPage.jsx"
     ],
     "css": [
-      "assets/index-CYC3B8xb.css"
+      "assets/index-XMEBadku.css"
     ]
   },
   "src/pages/AdminPage.jsx": {
-    "file": "assets/AdminPage-DqQ8ZkuN.js",
+    "file": "assets/AdminPage-CqiyVCdU.js",
     "name": "AdminPage",
     "src": "src/pages/AdminPage.jsx",
     "isDynamicEntry": true,
@@ -106,7 +106,7 @@
     ]
   },
   "src/pages/BankSyncPage.jsx": {
-    "file": "assets/BankSyncPage-D9bbRhTD.js",
+    "file": "assets/BankSyncPage-LujdaS23.js",
     "name": "BankSyncPage",
     "src": "src/pages/BankSyncPage.jsx",
     "isDynamicEntry": true,
@@ -123,7 +123,7 @@
     ]
   },
   "src/pages/DashboardPage.jsx": {
-    "file": "assets/DashboardPage-Cbcuz0_t.js",
+    "file": "assets/DashboardPage-B1jffnWG.js",
     "name": "DashboardPage",
     "src": "src/pages/DashboardPage.jsx",
     "isDynamicEntry": true,
@@ -139,7 +139,7 @@
     ]
   },
   "src/pages/LoanOptimizerPage.jsx": {
-    "file": "assets/LoanOptimizerPage-BhSQKq-s.js",
+    "file": "assets/LoanOptimizerPage-77dnzHSk.js",
     "name": "LoanOptimizerPage",
     "src": "src/pages/LoanOptimizerPage.jsx",
     "isDynamicEntry": true,
@@ -156,7 +156,7 @@
     ]
   },
   "src/pages/LoginPage.jsx": {
-    "file": "assets/LoginPage-B9qAL7_N.js",
+    "file": "assets/LoginPage-XYeUHlsM.js",
     "name": "LoginPage",
     "src": "src/pages/LoginPage.jsx",
     "isDynamicEntry": true,
@@ -172,7 +172,7 @@
     ]
   },
   "src/pages/PaymentsPage.jsx": {
-    "file": "assets/PaymentsPage-lGEnC5cy.js",
+    "file": "assets/PaymentsPage-BEzSo0-a.js",
     "name": "PaymentsPage",
     "src": "src/pages/PaymentsPage.jsx",
     "isDynamicEntry": true,
@@ -190,7 +190,7 @@
     ]
   },
   "src/pages/SettingsPage.jsx": {
-    "file": "assets/SettingsPage-IDHAPlhC.js",
+    "file": "assets/SettingsPage-Dke5Tnjf.js",
     "name": "SettingsPage",
     "src": "src/pages/SettingsPage.jsx",
     "isDynamicEntry": true,
@@ -222,7 +222,7 @@
     ]
   },
   "src/pages/TransactionsPage.jsx": {
-    "file": "assets/TransactionsPage-CS_0G97u.js",
+    "file": "assets/TransactionsPage-1c1oFdLk.js",
     "name": "TransactionsPage",
     "src": "src/pages/TransactionsPage.jsx",
     "isDynamicEntry": true,
@@ -240,7 +240,7 @@
     ]
   },
   "src/pages/TripPlannerPage.jsx": {
-    "file": "assets/TripPlannerPage-D4-0uRyp.js",
+    "file": "assets/TripPlannerPage-BXSbU7u8.js",
     "name": "TripPlannerPage",
     "src": "src/pages/TripPlannerPage.jsx",
     "isDynamicEntry": true,
@@ -273,7 +273,7 @@
     ]
   },
   "src/pages/WalletsPage.jsx": {
-    "file": "assets/WalletsPage-B8jNP0cI.js",
+    "file": "assets/WalletsPage-B8tjczBt.js",
     "name": "WalletsPage",
     "src": "src/pages/WalletsPage.jsx",
     "isDynamicEntry": true,

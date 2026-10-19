@@ -17,7 +17,7 @@ const ProtectedRoute = ({ children, adminOnly = false, businessOnly = false }) =
     return <Navigate to="/" replace />;
   }
 
-  if (businessOnly && interfaceRole !== 'business_user') {
+  if (businessOnly && interfaceRole !== 'business_user' && !['super_admin'].includes(user.role) && !user.isSuperAdmin) {
     return <Navigate to="/" replace />;
   }
 

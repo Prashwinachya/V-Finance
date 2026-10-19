@@ -287,10 +287,15 @@ const UserManagementTable = ({
                       {/* Role Badge */}
                       <td className="px-3 py-3.5">
                         {isSuperAdminUser ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-700">
-                            <Sparkles size={11} className="text-purple-600" />
-                            Super Admin
-                          </span>
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-700">
+                              <Sparkles size={11} className="text-purple-600" />
+                              Super Admin
+                            </span>
+                            <span className="inline-flex items-center rounded-md bg-purple-100/70 px-1.5 py-0.5 text-[10px] font-bold text-purple-800">
+                              Student & Business
+                            </span>
+                          </div>
                         ) : isAdminUser ? (
                           <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700">
                             <Shield size={11} className="text-rose-600" />
@@ -309,16 +314,29 @@ const UserManagementTable = ({
 
                       {/* Portal */}
                       <td className="px-3 py-3.5">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold ${
-                            isBusiness
-                              ? 'bg-slate-100 text-slate-700'
-                              : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                          }`}
-                        >
-                          <Building size={12} />
-                          {isBusiness ? 'Commercial' : 'Campus'}
-                        </span>
+                        {isSuperAdminUser ? (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                              <Building size={11} />
+                              Campus
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-bold text-cyan-700">
+                              <Building size={11} />
+                              Commercial
+                            </span>
+                          </div>
+                        ) : (
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold ${
+                              isBusiness
+                                ? 'bg-slate-100 text-slate-700'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                            }`}
+                          >
+                            <Building size={12} />
+                            {isBusiness ? 'Commercial' : 'Campus'}
+                          </span>
+                        )}
                       </td>
 
                       {/* Activity */}

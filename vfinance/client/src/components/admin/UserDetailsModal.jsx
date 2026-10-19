@@ -66,10 +66,15 @@ const UserDetailsModal = ({ user, isOpen, onClose }) => {
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-xl font-extrabold text-slate-900">{user.name}</h3>
                   {isSuperAdmin ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700">
-                      <Sparkles size={11} className="text-purple-600" />
-                      Super Admin
-                    </span>
+                    <>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700">
+                        <Sparkles size={11} className="text-purple-600" />
+                        Super Admin
+                      </span>
+                      <span className="inline-flex items-center rounded-md bg-purple-100/70 px-2 py-0.5 text-[11px] font-bold text-purple-800">
+                        Student & Business Roles
+                      </span>
+                    </>
                   ) : isAdmin ? (
                     <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700">
                       <ShieldCheck size={11} className="text-rose-600" />
@@ -137,7 +142,7 @@ const UserDetailsModal = ({ user, isOpen, onClose }) => {
             <div className="rounded-2xl border border-cyan-100/60 bg-cyan-50/40 p-3.5 text-center">
               <Building className="mx-auto h-5 w-5 text-cyan-600" />
               <p className="mt-2 text-xs font-extrabold text-slate-900 capitalize">
-                {user.portalRole || user.portal || 'Student'}
+                {isSuperAdmin ? 'Dual (Campus & Commercial)' : (user.portalRole || user.portal || 'Student')}
               </p>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Portal Mode</p>
             </div>
