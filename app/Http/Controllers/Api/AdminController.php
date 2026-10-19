@@ -96,7 +96,7 @@ class AdminController extends Controller
             'require_payment_fingerprint' => $data['requirePaymentFingerprint'] ?? $user->require_payment_fingerprint,
         ])->save();
 
-        return response()->json(ApiTransformer::user($user));
+        return response()->json(ApiTransformer::user($user->fresh()));
     }
 
     public function destroyUser(Request $request, User $user): JsonResponse

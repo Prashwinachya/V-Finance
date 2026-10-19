@@ -15,31 +15,39 @@ class UserController extends Controller
     public function updateProfile(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
-            'email' => ['sometimes', 'email', 'max:255', 'unique:users,email,'.$request->user()->id],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'dateOfBirth' => ['nullable', 'date', 'before:today'],
-            'gender' => ['nullable', 'in:male,female,non_binary,prefer_not_to_say'],
-            'city' => ['nullable', 'string', 'max:120'],
-            'country' => ['nullable', 'string', 'max:120'],
-            'timezone' => ['nullable', 'string', 'max:80'],
-            'bio' => ['nullable', 'string', 'max:1000'],
+            'name'        => ['sometimes', 'string', 'max:255'],
+            'email'       => ['sometimes', 'email', 'max:255', 'unique:users,email,'.$request->user()->id],
+            'phone'       => ['sometimes', 'nullable', 'string', 'max:30'],
+            'dateOfBirth' => ['sometimes', 'nullable', 'date', 'before:today'],
+            'gender'      => ['sometimes', 'nullable', 'in:male,female,non_binary,prefer_not_to_say'],
+            'city'        => ['sometimes', 'nullable', 'string', 'max:120'],
+            'country'     => ['sometimes', 'nullable', 'string', 'max:120'],
+            'timezone'    => ['sometimes', 'nullable', 'string', 'max:80'],
+            'bio'         => ['sometimes', 'nullable', 'string', 'max:1000'],
         ]);
 
         $user = $request->user();
-        $user->fill([
-            'name' => $data['name'] ?? $user->name,
-            'email' => $data['email'] ?? $user->email,
-            'phone' => $data['phone'] ?? $user->phone,
-            'date_of_birth' => $data['dateOfBirth'] ?? $user->date_of_birth,
-            'gender' => $data['gender'] ?? $user->gender,
-            'city' => $data['city'] ?? $user->city,
-            'country' => $data['country'] ?? $user->country,
-            'timezone' => $data['timezone'] ?? $user->timezone,
-            'bio' => $data['bio'] ?? $user->bio,
-        ])->save();
 
-        return response()->json(ApiTransformer::user($user));
+        // Only overwrite a field when the client explicitly sent it.
+        // Using array_key_exists prevents absent keys from nulling existing data.
+        $updates = [];
+        if (array_key_exists('name', $data))        $updates['name']          = $data['name'] ?? $user->name;
+        if (array_key_exists('email', $data))       $updates['email']         = $data['email'] ?? $user->email;
+        if (array_key_exists('phone', $data))       $updates['phone']         = $data['phone'];
+        if (array_key_exists('dateOfBirth', $data)) $updates['date_of_birth'] = $data['dateOfBirth'];
+        if (array_key_exists('gender', $data))      $updates['gender']        = $data['gender'];
+        if (array_key_exists('city', $data))        $updates['city']          = $data['city'];
+        if (array_key_exists('country', $data))     $updates['country']       = $data['country'];
+        if (array_key_exists('timezone', $data))    $updates['timezone']      = $data['timezone'];
+        if (array_key_exists('bio', $data))         $updates['bio']           = $data['bio'];
+
+        if (! empty($updates)) {
+            $user->fill($updates)->save();
+        }
+
+        // Always return the freshest state from the DB so the response
+        // cannot reflect a stale Eloquent attribute cache.
+        return response()->json(ApiTransformer::user($user->fresh()));
     }
 
     public function uploadAvatar(Request $request): JsonResponse
@@ -94,9 +102,10 @@ class UserController extends Controller
             }
         }
 
+        $freshUser = $user->fresh();
         return response()->json([
-            'avatarUrl' => $user->avatar_url,
-            'user' => ApiTransformer::user($user),
+            'avatarUrl' => $freshUser->avatar_url,
+            'user' => ApiTransformer::user($freshUser),
             'message' => 'Profile picture updated successfully.',
         ]);
     }

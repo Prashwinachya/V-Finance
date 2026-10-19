@@ -8,7 +8,7 @@ const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const ProfileSettings = () => {
-  const { user, refreshMe } = useAuth();
+  const { user, refreshMe, updateUser } = useAuth();
 
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -156,14 +156,26 @@ const ProfileSettings = () => {
     setBusy(true);
 
     try {
-      await api.put('/user/profile', {
+      // Send only the fields the user can edit; backend uses array_key_exists
+      // guard so absent keys never overwrite existing DB data.
+      const profileRes = await api.put('/user/profile', {
         name,
-        phone,
+        phone: phone || null,
         dateOfBirth: dateOfBirth || null,
         gender: gender || null,
-        city,
-        bio,
+        city: city || null,
+        bio: bio || null,
       });
+
+      // Immediately update AuthContext from the server response so the
+      // UI reflects the committed state without a separate /auth/me round-trip.
+      const updatedUser = profileRes.data?.user ?? profileRes.data;
+      if (updatedUser && (updatedUser.id || updatedUser._id)) {
+        updateUser(updatedUser);
+      } else {
+        // Fallback: re-fetch from /auth/me
+        await refreshMe();
+      }
 
       if (avatarFile) {
         const validationError = validateFile(avatarFile);
@@ -175,16 +187,22 @@ const ProfileSettings = () => {
 
         const fd = new FormData();
         fd.append('avatar', avatarFile);
-        await api.post('/user/avatar', fd, {
+        const avatarRes = await api.post('/user/avatar', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+        const avatarUser = avatarRes.data?.user ?? avatarRes.data;
+        if (avatarUser && (avatarUser.id || avatarUser._id)) {
+          updateUser(avatarUser);
+        } else {
+          await refreshMe();
+        }
         cancelAvatarSelection();
       }
 
-      await refreshMe();
       setMessage('Profile updated successfully.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update profile.');
+      // Keep form values intact so the user can retry without losing their edits.
+      setError(err.response?.data?.message || err.response?.data?.errors?.name?.[0] || 'Failed to update profile.');
     } finally {
       setBusy(false);
     }

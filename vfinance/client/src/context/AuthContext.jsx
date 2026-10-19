@@ -14,7 +14,8 @@ const loadCachedUser = () => {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch (_error) {
+  // eslint-disable-next-line no-unused-vars
+  } catch (_) {
     return null;
   }
 };
@@ -71,6 +72,21 @@ export const AuthProvider = ({ children }) => {
 
     const remember = Boolean(localStorage.getItem('vfinance_token'));
     saveCachedUser(payload, remember);
+  };
+
+  /**
+   * Merge a partial or full user payload into the current auth state and
+   * persist it to the cache. Used by ProfileSettings to update the context
+   * immediately from the API response without a second /auth/me round-trip.
+   */
+  const updateUser = (partialUser) => {
+    if (!partialUser || typeof partialUser !== 'object') return;
+    setUser((prev) => {
+      const merged = { ...(prev ?? {}), ...partialUser };
+      const remember = Boolean(localStorage.getItem('vfinance_token'));
+      saveCachedUser(merged, remember);
+      return merged;
+    });
   };
 
   useEffect(() => {
@@ -157,7 +173,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const value = useMemo(
-    () => ({ user, loading, isAuthenticated: Boolean(user), login, register, logout, refreshMe }),
+    () => ({ user, loading, isAuthenticated: Boolean(user), login, register, logout, refreshMe, updateUser }),
     [user, loading]
   );
 
@@ -166,6 +182,7 @@ export const AuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
