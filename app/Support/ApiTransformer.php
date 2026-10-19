@@ -73,6 +73,8 @@ class ApiTransformer
             'biometricRpId' => $user->webauthn_rp_id,
             'lastLoginAt' => self::date($user->last_login_at),
             'loginCount' => (int) $user->login_count,
+            'transactionsCount' => (int) ($user->transactions_count ?? 0),
+            'budgetsCount' => (int) ($user->budgets_count ?? 0),
             'createdAt' => self::date($user->created_at),
             'updatedAt' => self::date($user->updated_at),
         ];

@@ -35,7 +35,7 @@ const UserManagementTable = ({
   const [portalFilter, setPortalFilter] = useState('all');
   const [sortBy, setSortBy] = useState('joined_desc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
 
   // Filtered and sorted users
   const filteredUsers = useMemo(() => {
@@ -461,10 +461,10 @@ const UserManagementTable = ({
                 }}
                 className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 outline-none"
               >
-                <option value={5}>5 per page</option>
                 <option value={10}>10 per page</option>
-                <option value={20}>20 per page</option>
+                <option value={25}>25 per page</option>
                 <option value={50}>50 per page</option>
+                <option value={100}>100 per page</option>
               </select>
             </div>
           </div>

@@ -5,7 +5,6 @@ import {
   Plane,
   Wallet,
   ShieldCheck,
-  Landmark,
   Radar,
   Coins,
   CreditCard,
@@ -126,16 +125,15 @@ const Layout = ({ children }) => {
       <header className="sticky top-0 z-40 w-full border-b border-pink-100/60 bg-white/80 px-3 py-2.5 backdrop-blur-xl transition-all duration-300 sm:px-6">
         <div className="mx-auto flex w-full max-w-[1240px] items-center justify-between gap-3">
           {/* Brand Logo */}
-          <Link to="/" className="group inline-flex shrink-0 items-center gap-2.5" aria-label="VFinance Home">
-            <div className="relative grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-tr from-pink-600 via-rose-500 to-purple-600 text-white shadow-md shadow-pink-500/20 transition-all duration-300 group-hover:scale-105 group-hover:shadow-pink-500/35">
-              <Landmark size={20} className="drop-shadow-sm" />
-              <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <Link to="/" className="group inline-flex shrink-0 items-center gap-3" aria-label="VFinance Home">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-pink-500 via-rose-500 to-violet-600 text-white shadow-md shadow-pink-300/40 transition-transform duration-200 group-hover:scale-105">
+              <span className="text-xl font-black">V</span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-xl font-extrabold tracking-tight text-slate-900 leading-tight">
-                V<span className="bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">Finance</span>
+            <div className="flex items-center">
+              <span className="text-base font-black tracking-tight text-slate-900 sm:text-lg">VFinance</span>
+              <span className="ml-2 rounded-full bg-pink-100 px-2.5 py-0.5 text-[10px] font-bold text-pink-700 uppercase tracking-wider">
+                Portal
               </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Fintech Suite</span>
             </div>
           </Link>
 

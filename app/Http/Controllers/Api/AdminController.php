@@ -169,16 +169,20 @@ class AdminController extends Controller
 
     private function scopedUserQuery(Request $request)
     {
-        $role = (string) ($request->user()?->role ?? '');
+        $query = User::query();
 
-        if ($role === 'super_admin_student') {
-            return User::query()->whereIn('role', ['student', 'user']);
+        if ($request->filled('role') && $request->query('role') !== 'all') {
+            $query->where('role', $request->query('role'));
         }
 
-        if (in_array($role, ['super_admin_business', 'super_admin'], true)) {
-            return User::query()->where('role', 'business_user');
+        if ($request->filled('portal') && $request->query('portal') !== 'all') {
+            $portal = $request->query('portal');
+            $query->where(function ($q) use ($portal) {
+                $q->where('portal', $portal)
+                    ->orWhere('role', $portal);
+            });
         }
 
-        return User::query();
+        return $query;
     }
 }
